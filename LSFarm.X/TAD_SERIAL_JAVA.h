@@ -5,6 +5,8 @@
 #define JAVA_TX LATCbits.LATC6
 #define JAVA_RX PORTCbits.RC7
 
-void SerialJava_Init(void);
+void SerialJava_Init (void);
+unsigned char SJ_PutString( const char *str);
+const char *SJ_GetLine (void);
 
 #endif
