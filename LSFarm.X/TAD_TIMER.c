@@ -9,8 +9,8 @@
 #include <xc.h>
 #include "TAD_TIMER.h"
 
-#define T0CON_CONFIG 0x82
-#define RECARREGA_TMR0 64911 //2ms
+#define T0CON_CONFIG 0x88
+#define RECARREGA_TMR0 63036 // 1 ms con Fosc = 10 MHz
 
 #define TI_NUMTIMERS 10
 

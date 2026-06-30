@@ -1,13 +1,16 @@
-/*
- * File:   TAD_EEPROM.c
- * Author: yanni
- *
- * Created on 29 de junio de 2026, 18:28
- */
-
-
 #include <xc.h>
+#include "TAD_EEPROM.h"
 
-void main(void) {
-    return;
+static unsigned char busy;
+
+void EEPROM_Init (void) {
+    busy = 0;
+}
+
+void motorEEPROM (void) {
+    static unsigned char state = 0;
+
+    switch (state) {
+        
+    }
 }

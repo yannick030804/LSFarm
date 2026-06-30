@@ -1,13 +1,9 @@
-/*
- * File:   TAD_PROTOCOL.c
- * Author: yanni
- *
- * Created on 29 de junio de 2026, 17:23
- */
-
-
 #include <xc.h>
+#include "TAD_PROTOCOL.h"
+#include "TAD_TIMER.h"
 
-void main(void) {
-    return;
+static unsigned char timerHandle;
+
+void Protocol_Init(void) {
+    TI_NewTimer(&timerHandle);
 }

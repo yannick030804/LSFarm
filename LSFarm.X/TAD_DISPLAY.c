@@ -1,17 +1,14 @@
 #include <xc.h>
-#include "TAD_HEARTBEAT.h"
+#include "TAD_DISPLAY.h"
 #include "TAD_TIMER.h"
 
 static unsigned char timerHandle;
-static unsigned char rebellion;
 
-void Heartbeat_Init (void) {
-    CONFIG_HEARTBEAT;
+void Display_Init (void) {
     TI_NewTimer(&timerHandle);
-    rebellion = 0;
 }
 
-void motorHeartbeat (void) {
+void motorDisplay (void) {
     static unsigned char state = 0;
 
     switch (state) {
