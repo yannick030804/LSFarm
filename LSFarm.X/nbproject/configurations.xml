@@ -7,7 +7,6 @@
       <itemPath>TAD_CONTROLLER.h</itemPath>
       <itemPath>TAD_TIMER.h</itemPath>
       <itemPath>TAD_FARM.h</itemPath>
-      <itemPath>TAD_PROTOCOL.h</itemPath>
       <itemPath>TAD_SERIAL_JAVA.h</itemPath>
       <itemPath>TAD_SERIAL_TIME.h</itemPath>
       <itemPath>TAD_LCD.h</itemPath>
@@ -29,7 +28,6 @@
       <itemPath>TAD_TIMER.c</itemPath>
       <itemPath>TAD_SERIAL_TIME.c</itemPath>
       <itemPath>TAD_SERIAL_JAVA.c</itemPath>
-      <itemPath>TAD_PROTOCOL.c</itemPath>
       <itemPath>TAD_LDR.c</itemPath>
       <itemPath>TAD_LCD.c</itemPath>
       <itemPath>TAD_JOYSTICK.c</itemPath>

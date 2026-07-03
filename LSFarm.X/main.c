@@ -9,7 +9,6 @@
 #include "TAD_JOYSTICK.h"
 #include "TAD_LCD.h"
 #include "TAD_LDR.h"
-#include "TAD_PROTOCOL.h"
 #include "TAD_SERIAL_JAVA.h"
 #include "TAD_SERIAL_TIME.h"
 #include "TAD_TIMER.h"
@@ -26,6 +25,11 @@
 void __interrupt () RSI_HIGH (void) {
     if(INTCONbits.TMR0IF == 1) {
         RSI_Timer0();
+        SerialTime_TickISR();
+    }
+    if (INTCON3bits.INT2IE == 1 && INTCON3bits.INT2IF == 1) {
+        INTCON3bits.INT2IF = 0;
+        SerialTime_StartBitISR();
     }
 }
 
@@ -47,7 +51,6 @@ void main (void) {
     Joystick_Init();
     LCD_Init();
     LDR_Init();
-    Protocol_Init();
     SerialJava_Init();
     SerialTime_Init();
     
@@ -55,6 +58,7 @@ void main (void) {
         motorButton();
         motorController();
         motorDisplay();
+        motorLCD();
         motorEEPROM();
         motorFarm();
         motorHeartbeat();

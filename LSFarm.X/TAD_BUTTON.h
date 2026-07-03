@@ -2,7 +2,8 @@
 #define TAD_BUTTON_H
 
 #define CONFIG_BTN TRISBbits.TRISB0 = 1
-#define BUTTON PORTBbits.RB0
+#define JOYSTICK_SW PORTBbits.RB0
+#define BUTTON JOYSTICK_SW
 #define REBOUNDS 16
 
 void Button_Init (void);

@@ -33,6 +33,17 @@ static void CantaIR(char ir)
     EnableDown();
 }
 
+static void CantaData(char data)
+{
+    RSUp();
+    EnableUp();
+    CantaPartAlta(data);
+    EnableDown();
+    EnableUp();
+    CantaPartBaixa(data);
+    EnableDown();
+}
+
 static void EscriuPrimeraOrdre(char ordre)
 {
     RSDown();
@@ -83,10 +94,72 @@ void LCD_Init(void) {
     CantaIR(0x0C);
 }
 
+void LCD_Clear(void)
+{
+    unsigned char i;
+
+    for (i = 0; i < 32; i++) {
+        frame[i] = ' ';
+    }
+    cursor = 0;
+}
+
+void LCD_GotoXY(unsigned char column, unsigned char row)
+{
+    cursor = (unsigned char)(column + (row ? 16 : 0));
+    if (cursor >= 32) {
+        cursor = 0;
+    }
+}
+
+void LCD_PutChar(char c)
+{
+    frame[cursor] = c;
+    cursor++;
+    if (cursor >= 32) {
+        cursor = 0;
+    }
+}
+
+void LCD_PutString(const char *s)
+{
+    while (*s != '\0') {
+        LCD_PutChar(*s);
+        s++;
+    }
+}
+
 void motorLCD (void) {
     static unsigned char state = 0;
 
+    if (TI_GetTics(timerHandle) < 1) {
+        return;
+    }
+    TI_ResetTics(timerHandle);
+
     switch (state) {
-        
+        case 0:
+            CantaIR(0x80);
+            scan = 0;
+            state = 1;
+            break;
+        case 1:
+            CantaData(frame[scan]);
+            scan++;
+            if (scan >= 16) {
+                state = 2;
+            }
+            break;
+        case 2:
+            CantaIR(0xC0);
+            state = 3;
+            break;
+        case 3:
+            CantaData(frame[scan]);
+            scan++;
+            if (scan >= 32) {
+                state = 0;
+            }
+            break;
     }
 }

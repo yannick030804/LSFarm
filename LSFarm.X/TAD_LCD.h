@@ -5,5 +5,9 @@
 
 void LCD_Init (void);
 void motorLCD (void);
+void LCD_Clear (void);
+void LCD_GotoXY (unsigned char column, unsigned char row);
+void LCD_PutChar (char c);
+void LCD_PutString (const char *s);
 
 #endif

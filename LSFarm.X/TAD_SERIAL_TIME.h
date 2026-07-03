@@ -10,10 +10,17 @@ typedef struct {
 } STDate;
 
 #define CONFIG_SERIAL_TIME TRISBbits.TRISB1 = 0; TRISBbits.TRISB2 = 1; LATBbits.LATB1 = 1
-#define TIME_TX LATBbits.LATB1
-#define TIME_RX PORTBbits.RB2
 
 void SerialTime_Init (void);
 void motorSerialTime (void);
+void SerialTime_StartBitISR (void);
+void SerialTime_TickISR (void);
+unsigned char SerialTime_IsConfigured (void);
+const STDate *SerialTime_GetDate (void);
+unsigned char SerialTime_GetDay (void);
+unsigned char SerialTime_GetMonth (void);
+unsigned char SerialTime_GetHour (void);
+unsigned char SerialTime_GetMinute (void);
+unsigned char SerialTime_GetSecond (void);
 
 #endif

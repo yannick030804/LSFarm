@@ -9,12 +9,63 @@ void Heartbeat_Init (void) {
     CONFIG_HEARTBEAT;
     TI_NewTimer(&timerHandle);
     rebellion = 0;
+    HEARTBEAT = 0;
+    TI_ResetTics(timerHandle);
+}
+
+void Heartbeat_SetRebellion (unsigned char active) {
+    rebellion = active;
+    if (rebellion == 1) {
+        HEARTBEAT = 0;
+    }
 }
 
 void motorHeartbeat (void) {
     static unsigned char state = 0;
 
     switch (state) {
-        
+        case 0:
+            if (rebellion == 1) {
+                HEARTBEAT = 0;
+                TI_ResetTics(timerHandle);
+            } else if (TI_GetTics(timerHandle) >= 700) {
+                TI_ResetTics(timerHandle);
+                HEARTBEAT = 1;
+                state = 1;
+            }
+            break;
+        case 1:
+            if (rebellion == 1) {
+                HEARTBEAT = 0;
+                TI_ResetTics(timerHandle);
+                state = 0;
+            } else if (TI_GetTics(timerHandle) >= 70) {
+                TI_ResetTics(timerHandle);
+                HEARTBEAT = 0;
+                state = 2;
+            }
+            break;
+        case 2:
+            if (rebellion == 1) {
+                HEARTBEAT = 0;
+                TI_ResetTics(timerHandle);
+                state = 0;
+            } else if (TI_GetTics(timerHandle) >= 120) {
+                TI_ResetTics(timerHandle);
+                HEARTBEAT = 1;
+                state = 3;
+            }
+            break;
+        case 3:
+            if (rebellion == 1) {
+                HEARTBEAT = 0;
+                TI_ResetTics(timerHandle);
+                state = 0;
+            } else if (TI_GetTics(timerHandle) >= 70) {
+                TI_ResetTics(timerHandle);
+                HEARTBEAT = 0;
+                state = 0;
+            }
+            break;
     }
 }

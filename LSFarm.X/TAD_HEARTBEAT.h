@@ -6,5 +6,6 @@
 
 void Heartbeat_Init (void);
 void motorHeartbeat (void);
+void Heartbeat_SetRebellion (unsigned char active);
 
 #endif
