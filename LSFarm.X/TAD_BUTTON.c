@@ -3,42 +3,47 @@
 #include "TAD_TIMER.h"
 
 static unsigned char timerHandle;
-static unsigned char isPressed;
+static unsigned char buttonState;
 
 void Button_Init (void) {
     CONFIG_BTN;
     TI_NewTimer(&timerHandle);
-    isPressed = 0;
+    buttonState = 0;
 }
 
 unsigned char getButton (void) {
-    unsigned char aux = isPressed;
-    isPressed = 0;
-    return aux;
+    if (buttonState == 2) {
+        buttonState = 3;
+        return 1;
+    }
+    return 0;
 }
 
 void motorButton (void) {
-    static unsigned char state = 0;
-
-    switch (state) {
+    switch (buttonState) {
         case 0:
             if (BUTTON == 1) {
-                state = 0;
             } else if (BUTTON == 0) {
-                state = 1;
+                buttonState = 1;
                 TI_ResetTics(timerHandle);
             }
             break;
         case 1:
             if (BUTTON == 0 && TI_GetTics(timerHandle) >= REBOUNDS) {
-                isPressed = 1;
-                state = 2;
+                buttonState = 2;
                 TI_ResetTics(timerHandle);
+            } else if (BUTTON == 1) {
+                buttonState = 0;
             }
             break;
         case 2:
             if (BUTTON == 1 && TI_GetTics(timerHandle) >= 8) {
-                state = 0;
+                buttonState = 0;
+            }
+            break;
+        case 3:
+            if (BUTTON == 1 && TI_GetTics(timerHandle) >= 8) {
+                buttonState = 0;
             }
             break;
     }
