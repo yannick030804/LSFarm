@@ -11,6 +11,10 @@
 #define DISPLAY_TIMER_HANDLE() ((unsigned char)(displayLine[16] & DISPLAY_TIMER_MASK))
 #define DISPLAY_GET_STATE() ((unsigned char)((displayLine[16] >> DISPLAY_STATE_SHIFT) & 0x03))
 #define DISPLAY_SET_STATE(value) (displayLine[16] = (char)((displayLine[16] & DISPLAY_TIMER_MASK) | ((value) << DISPLAY_STATE_SHIFT)))
+#define DISPLAY_GET_LAST_DAY() ((unsigned char)displayLine[14])
+#define DISPLAY_SET_LAST_DAY(value) (displayLine[14] = (char)(value))
+#define DISPLAY_GET_LAST_MONTH() ((unsigned char)displayLine[15])
+#define DISPLAY_SET_LAST_MONTH(value) (displayLine[15] = (char)(value))
 
 static char displayLine[17];
 
@@ -147,19 +151,17 @@ void Display_Init (void) {
 }
 
 void motorDisplay (void) {
-    static unsigned char lastDay = 255;
-    static unsigned char lastMonth = 255;
     FarmNotification notification;
 
     switch (DISPLAY_GET_STATE()) {
         case 0:
             Display_ShowIdleScreen();
             if (SerialTime_IsConfigured() == 1) {
-                lastDay = SerialTime_GetDay();
-                lastMonth = SerialTime_GetMonth();
+                DISPLAY_SET_LAST_DAY(SerialTime_GetDay());
+                DISPLAY_SET_LAST_MONTH(SerialTime_GetMonth());
             } else {
-                lastDay = 255;
-                lastMonth = 255;
+                DISPLAY_SET_LAST_DAY(255);
+                DISPLAY_SET_LAST_MONTH(255);
             }
             DISPLAY_SET_STATE(1);
             break;
@@ -173,12 +175,12 @@ void motorDisplay (void) {
 
             if (Farm_IsConfigured() == 0 || SerialTime_IsConfigured() == 0) {
                 Display_ShowIdleScreen();
-                lastDay = 255;
-                lastMonth = 255;
-            } else if (SerialTime_GetDay() != lastDay || SerialTime_GetMonth() != lastMonth) {
+                DISPLAY_SET_LAST_DAY(255);
+                DISPLAY_SET_LAST_MONTH(255);
+            } else if (SerialTime_GetDay() != DISPLAY_GET_LAST_DAY() || SerialTime_GetMonth() != DISPLAY_GET_LAST_MONTH()) {
                 Display_ShowIdleScreen();
-                lastDay = SerialTime_GetDay();
-                lastMonth = SerialTime_GetMonth();
+                DISPLAY_SET_LAST_DAY(SerialTime_GetDay());
+                DISPLAY_SET_LAST_MONTH(SerialTime_GetMonth());
             }
             break;
         case 2:
