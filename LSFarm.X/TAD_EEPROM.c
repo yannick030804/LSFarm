@@ -1,10 +1,6 @@
 #include <xc.h>
 #include "TAD_EEPROM.h"
 
-static unsigned char buffer[16];
-static unsigned char writeAddr;
-static unsigned char writeLen;
-static unsigned char writeIndex;
 static unsigned char busy;
 static unsigned char mode;
 static unsigned int clearIndex;
@@ -30,9 +26,6 @@ static void launchWrite (unsigned char addr, unsigned char data) {
 void EEPROM_Init (void) {
     busy = 0;
     mode = 0;
-    writeAddr = 0;
-    writeLen = 0;
-    writeIndex = 0;
     clearIndex = 0;
     imageAddr = 0;
     imageLen = 0;
@@ -54,17 +47,7 @@ void motorEEPROM (void) {
                 break;
             }
 
-            if (mode == 1) {
-                if (writeIndex >= writeLen) {
-                    EECON1bits.WREN = 0;
-                    busy = 0;
-                    mode = 0;
-                    state = 0;
-                } else {
-                    launchWrite((unsigned char)(writeAddr + writeIndex), buffer[writeIndex]);
-                    writeIndex++;
-                }
-            } else if (mode == 2) {
+            if (mode == 2) {
                 if (clearIndex >= 256U) {
                     EECON1bits.WREN = 0;
                     busy = 0;
@@ -107,25 +90,6 @@ void EEPROM_ReadBlock (unsigned char addr, unsigned char *dst, unsigned char len
     for (i = 0; i < len; i++) {
         dst[i] = EEPROM_ReadByte((unsigned char)(addr + i));
     }
-}
-
-unsigned char EEPROM_StartWrite (unsigned char addr, const unsigned char *src, unsigned char len) {
-    unsigned char i;
-
-    if (busy == 1 || len > sizeof(buffer)) {
-        return 0;
-    }
-
-    for (i = 0; i < len; i++) {
-        buffer[i] = src[i];
-    }
-
-    writeAddr = addr;
-    writeLen = len;
-    writeIndex = 0;
-    mode = 1;
-    busy = 1;
-    return 1;
 }
 
 unsigned char EEPROM_StartImageWrite (unsigned char addr, const unsigned char *src, unsigned char len) {
