@@ -21,8 +21,7 @@ static unsigned char param4;
 static unsigned char selectedNumber;
 static unsigned char selectedSpecies;
 static unsigned char selectHasDigits;
-static char sleepType[8];
-static unsigned char sleepTypeIndex;
+static unsigned char sleepTypeStart;
 static unsigned char initRequestSent;
 static unsigned char joystickEvent;
 static unsigned char animalIndex;
@@ -42,8 +41,7 @@ static void resetInitData (void) {
     selectedNumber = 0;
     selectedSpecies = 255;
     selectHasDigits = 0;
-    sleepTypeIndex = 0;
-    sleepType[0] = '\0';
+    sleepTypeStart = 0;
     initRequestSent = 0;
 }
 
@@ -61,33 +59,35 @@ static unsigned char isValidGenerationTime (unsigned char value) {
     return 0;
 }
 
-static unsigned char tokenEquals (const char *left, const char *right) {
-    unsigned char index = 0;
+static unsigned char tokenRangeEquals (const char *text, unsigned char start, unsigned char end, const char *token) {
+    unsigned char i = start;
+    unsigned char j = 0;
 
-    while (left[index] != '\0' && right[index] != '\0') {
-        if (left[index] != right[index]) {
+    while (i < end && token[j] != '\0') {
+        if (text[i] != token[j]) {
             return 0;
         }
-        index++;
+        i++;
+        j++;
     }
 
-    if (left[index] == '\0' && right[index] == '\0') {
+    if (i == end && token[j] == '\0') {
         return 1;
     }
     return 0;
 }
 
-static unsigned char getSpeciesFromText (const char *text) {
-    if (tokenEquals(text, "VACA")) {
+static unsigned char getSpeciesFromRange (const char *text, unsigned char start, unsigned char end) {
+    if (tokenRangeEquals(text, start, end, "VACA")) {
         return 0;
     }
-    if (tokenEquals(text, "PORC")) {
+    if (tokenRangeEquals(text, start, end, "PORC")) {
         return 1;
     }
-    if (tokenEquals(text, "CAVALL")) {
+    if (tokenRangeEquals(text, start, end, "CAVALL")) {
         return 2;
     }
-    if (tokenEquals(text, "GALLINA")) {
+    if (tokenRangeEquals(text, start, end, "GALLINA")) {
         return 3;
     }
     return 255;
@@ -282,8 +282,8 @@ void motorController (void) {
                 selectedNumber = 0;
                 selectedSpecies = 255;
                 selectHasDigits = 0;
-                sleepTypeIndex = 0;
                 i = 2;
+                sleepTypeStart = 2;
                 state = 9;
             } else {
                 state = 8;
@@ -370,17 +370,14 @@ void motorController (void) {
             if (line[i] == '\0') {
                 state = 15;
             } else if (line[i] == '$') {
-                sleepType[sleepTypeIndex] = '\0';
-                selectedSpecies = getSpeciesFromText(sleepType);
+                selectedSpecies = getSpeciesFromRange(line, sleepTypeStart, i);
                 if (selectedSpecies == 255) {
                     state = 15;
                 } else {
                     i++;
                     state = 10;
                 }
-            } else if (sleepTypeIndex < sizeof(sleepType) - 1) {
-                sleepType[sleepTypeIndex] = line[i];
-                sleepTypeIndex++;
+            } else if (i - sleepTypeStart < 7) {
                 i++;
             } else {
                 state = 15;
