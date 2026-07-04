@@ -22,25 +22,60 @@ static volatile unsigned char txNext;
 static volatile unsigned char txEcho;
 static const char *txPtr;
 
-static char rxLineA[7];
-static char rxLineB[7];
+static char rxChar0;
+static char rxChar1;
+static char rxChar2;
+static char rxChar3;
+static char rxChar4;
+static char rxChar5;
+static char rxChar6;
+static char rxChar7;
+static char rxChar8;
+static char rxChar9;
+static char rxChar10;
+static char rxChar11;
+static char rxChar12;
+static char rxChar13;
 static unsigned char rxLen;
 static unsigned char timeConfigured;
 static STDate currentDate;
 
 static void setRxChar (unsigned char index, char c) {
-    if (index < 7) {
-        rxLineA[index] = c;
-    } else {
-        rxLineB[index - 7] = c;
+    switch (index) {
+        case 0: rxChar0 = c; break;
+        case 1: rxChar1 = c; break;
+        case 2: rxChar2 = c; break;
+        case 3: rxChar3 = c; break;
+        case 4: rxChar4 = c; break;
+        case 5: rxChar5 = c; break;
+        case 6: rxChar6 = c; break;
+        case 7: rxChar7 = c; break;
+        case 8: rxChar8 = c; break;
+        case 9: rxChar9 = c; break;
+        case 10: rxChar10 = c; break;
+        case 11: rxChar11 = c; break;
+        case 12: rxChar12 = c; break;
+        case 13: rxChar13 = c; break;
     }
 }
 
 static char getRxChar (unsigned char index) {
-    if (index < 7) {
-        return rxLineA[index];
+    switch (index) {
+        case 0: return rxChar0;
+        case 1: return rxChar1;
+        case 2: return rxChar2;
+        case 3: return rxChar3;
+        case 4: return rxChar4;
+        case 5: return rxChar5;
+        case 6: return rxChar6;
+        case 7: return rxChar7;
+        case 8: return rxChar8;
+        case 9: return rxChar9;
+        case 10: return rxChar10;
+        case 11: return rxChar11;
+        case 12: return rxChar12;
+        default: return rxChar13;
     }
-    return rxLineB[index - 7];
 }
 
 static unsigned char isDigit (char c) {
