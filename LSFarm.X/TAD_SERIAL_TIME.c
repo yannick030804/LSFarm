@@ -3,6 +3,8 @@
 #include "TAD_TIMER.h"
 
 #define SERIAL_TIME_LINE_MAX 14
+#define SERIAL_TIME_OK_MSG "\r\nDate and time correct\r\n"
+#define SERIAL_TIME_ERROR_MSG "\r\nPlease input a correct date\r\n"
 #define ST_FLAG_RX_READY 0x01
 #define ST_FLAG_RX_ACTIVE 0x02
 #define ST_FLAG_TX_ACTIVE 0x04
@@ -41,6 +43,44 @@ static unsigned char isDigit (char c) {
 
 static unsigned char parseTwoDigits (unsigned char index) {
     return (unsigned char)((rxChars[index] - '0') * 10 + (rxChars[index + 1] - '0'));
+}
+
+static void serialTimeSetInvalid (void) {
+    txPtr = SERIAL_TIME_ERROR_MSG;
+    rxLen = 0;
+}
+
+static unsigned char serialTimeParseLine (void) {
+    if (rxLen != SERIAL_TIME_LINE_MAX) {
+        return 0;
+    }
+
+    if (isDigit(rxChars[0]) == 0 || isDigit(rxChars[1]) == 0 || rxChars[2] != '/' ||
+        isDigit(rxChars[3]) == 0 || isDigit(rxChars[4]) == 0 || rxChars[5] != ' ' ||
+        isDigit(rxChars[6]) == 0 || isDigit(rxChars[7]) == 0 || rxChars[8] != ':' ||
+        isDigit(rxChars[9]) == 0 || isDigit(rxChars[10]) == 0 || rxChars[11] != ':' ||
+        isDigit(rxChars[12]) == 0 || isDigit(rxChars[13]) == 0) {
+        return 0;
+    }
+
+    tempDay = parseTwoDigits(0);
+    tempMonth = parseTwoDigits(3);
+    tempHour = parseTwoDigits(6);
+    tempMinute = parseTwoDigits(9);
+    tempSecond = parseTwoDigits(12);
+
+    if (tempDay < 1 || tempDay > 31 || tempMonth < 1 || tempMonth > 12 ||
+        tempHour > 23 || tempMinute > 59 || tempSecond > 59) {
+        return 0;
+    }
+
+    currentDate.day = tempDay;
+    currentDate.month = tempMonth;
+    currentDate.hour = tempHour;
+    currentDate.minute = tempMinute;
+    currentDate.second = tempSecond;
+    stFlags |= ST_FLAG_TIME_CONFIGURED;
+    return 1;
 }
 
 static unsigned char getRxBitIdx (void) {
@@ -164,116 +204,10 @@ void motorSerialTime (void) {
             }
             break;
         case 1:
-            tempDay = 0;
-            tempMonth = 0;
-            tempHour = 0;
-            tempMinute = 0;
-            tempSecond = 0;
-            if (rxLen == SERIAL_TIME_LINE_MAX) {
-                state = 2;
+            if (serialTimeParseLine() == 1) {
+                txPtr = SERIAL_TIME_OK_MSG;
             } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
-                rxLen = 0;
-                state = 0;
-            }
-            break;
-        case 2:
-            if (isDigit(rxChars[0]) && isDigit(rxChars[1])) {
-                tempDay = parseTwoDigits(0);
-                state = 3;
-            } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
-                rxLen = 0;
-                state = 0;
-            }
-            break;
-        case 3:
-            if (rxChars[2] == '/') {
-                state = 4;
-            } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
-                rxLen = 0;
-                state = 0;
-            }
-            break;
-        case 4:
-            if (isDigit(rxChars[3]) && isDigit(rxChars[4])) {
-                tempMonth = parseTwoDigits(3);
-                state = 5;
-            } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
-                rxLen = 0;
-                state = 0;
-            }
-            break;
-        case 5:
-            if (rxChars[5] == ' ') {
-                state = 6;
-            } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
-                rxLen = 0;
-                state = 0;
-            }
-            break;
-        case 6:
-            if (isDigit(rxChars[6]) && isDigit(rxChars[7])) {
-                tempHour = parseTwoDigits(6);
-                state = 7;
-            } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
-                rxLen = 0;
-                state = 0;
-            }
-            break;
-        case 7:
-            if (rxChars[8] == ':') {
-                state = 8;
-            } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
-                rxLen = 0;
-                state = 0;
-            }
-            break;
-        case 8:
-            if (isDigit(rxChars[9]) && isDigit(rxChars[10])) {
-                tempMinute = parseTwoDigits(9);
-                state = 9;
-            } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
-                rxLen = 0;
-                state = 0;
-            }
-            break;
-        case 9:
-            if (rxChars[11] == ':') {
-                state = 10;
-            } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
-                rxLen = 0;
-                state = 0;
-            }
-            break;
-        case 10:
-            if (isDigit(rxChars[12]) && isDigit(rxChars[13])) {
-                tempSecond = parseTwoDigits(12);
-                state = 11;
-            } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
-                rxLen = 0;
-                state = 0;
-            }
-            break;
-        case 11:
-            if (tempDay >= 1 && tempDay <= 31 && tempMonth >= 1 && tempMonth <= 12 && tempHour <= 23 && tempMinute <= 59 && tempSecond <= 59) {
-                currentDate.day = tempDay;
-                currentDate.month = tempMonth;
-                currentDate.hour = tempHour;
-                currentDate.minute = tempMinute;
-                currentDate.second = tempSecond;
-                stFlags |= ST_FLAG_TIME_CONFIGURED;
-                txPtr = "\r\nDate and time correct\r\n";
-            } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
+                serialTimeSetInvalid();
             }
             rxLen = 0;
             state = 12;
