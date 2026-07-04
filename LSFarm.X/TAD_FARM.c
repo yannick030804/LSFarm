@@ -61,7 +61,8 @@ static unsigned char lastProduct[FARM_NUM_SPECIES];
 static unsigned char animalInfo[FARM_MAX_ANIMALS];
 static unsigned long animalSleepStamp[FARM_MAX_ANIMALS];
 static unsigned char notificationMeta[FARM_NOTIFICATION_QUEUE_SIZE];
-static unsigned char notificationValue[FARM_NOTIFICATION_QUEUE_SIZE];
+static unsigned char notificationValueA[4];
+static unsigned char notificationValueB[4];
 static unsigned char notificationHead;
 static unsigned char notificationCount;
 
@@ -85,6 +86,8 @@ static unsigned char Farm_GetAnimalSpecies (unsigned char index);
 static unsigned char Farm_IsAnimalCritical (unsigned char index);
 static void Farm_SetAnimalSpecies (unsigned char index, unsigned char species);
 static void Farm_SetAnimalCritical (unsigned char index, unsigned char critical);
+static void Farm_SetNotificationValue (unsigned char index, unsigned char value);
+static unsigned char Farm_GetNotificationValue (unsigned char index);
 
 void Farm_Init (void) {
     TI_NewTimer(&timerHandle);
@@ -420,7 +423,7 @@ unsigned char Farm_GetNotification (FarmNotification *notification) {
 
     notification->kind = (unsigned char)(notificationMeta[notificationHead] >> 2);
     notification->species = (unsigned char)(notificationMeta[notificationHead] & 0x03);
-    notification->number = notificationValue[notificationHead];
+    notification->number = Farm_GetNotificationValue(notificationHead);
     notificationHead++;
     if (notificationHead >= FARM_NOTIFICATION_QUEUE_SIZE) {
         notificationHead = 0;
@@ -646,7 +649,7 @@ static void Farm_PushNotification (unsigned char kind, unsigned char species, un
     }
 
     notificationMeta[tail] = (unsigned char)(((kind & 0x3F) << 2) | (species & 0x03));
-    notificationValue[tail] = number;
+    Farm_SetNotificationValue(tail, number);
     notificationCount++;
 }
 
@@ -830,4 +833,19 @@ static void Farm_SetAnimalCritical (unsigned char index, unsigned char critical)
     } else {
         animalInfo[index] &= (unsigned char)(~ANIMAL_CRITICAL_MASK);
     }
+}
+
+static void Farm_SetNotificationValue (unsigned char index, unsigned char value) {
+    if (index < 4) {
+        notificationValueA[index] = value;
+    } else {
+        notificationValueB[index - 4] = value;
+    }
+}
+
+static unsigned char Farm_GetNotificationValue (unsigned char index) {
+    if (index < 4) {
+        return notificationValueA[index];
+    }
+    return notificationValueB[index - 4];
 }
