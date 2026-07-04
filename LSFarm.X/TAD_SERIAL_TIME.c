@@ -3,18 +3,20 @@
 #include "TAD_TIMER.h"
 
 #define SERIAL_TIME_LINE_MAX 14
+#define ST_FLAG_RX_READY 0x01
+#define ST_FLAG_RX_ACTIVE 0x02
+#define ST_FLAG_TX_ACTIVE 0x04
+#define ST_FLAG_TIME_CONFIGURED 0x08
 
 static unsigned char timerHandle;
 
 static volatile unsigned char rxByte;
-static volatile unsigned char rxReady;
-static volatile unsigned char rxActive;
+static volatile unsigned char stFlags;
 static volatile unsigned char rxBitIdx;
 static volatile unsigned char rxShift;
 static volatile unsigned char rxPos;
 static volatile unsigned char rxNext;
 
-static volatile unsigned char txActive;
 static volatile unsigned char txBitIdx;
 static volatile unsigned char txShift;
 static volatile unsigned char txPos;
@@ -37,7 +39,6 @@ static char rxChar11;
 static char rxChar12;
 static char rxChar13;
 static unsigned char rxLen;
-static unsigned char timeConfigured;
 static STDate currentDate;
 static unsigned char tempDay;
 static unsigned char tempMonth;
@@ -97,7 +98,7 @@ static unsigned char parseTwoDigits (unsigned char index) {
 static void txTick (void) {
     unsigned char b;
 
-    if (txActive == 0) {
+    if ((stFlags & ST_FLAG_TX_ACTIVE) == 0) {
         b = 0;
 
         if (txEcho != 0) {
@@ -117,7 +118,7 @@ static void txTick (void) {
             txBitIdx = 0;
             txPos = 0;
             txNext = 3;
-            txActive = 1;
+            stFlags |= ST_FLAG_TX_ACTIVE;
         }
         return;
     }
@@ -136,7 +137,7 @@ static void txTick (void) {
     } else if (txBitIdx == 9) {
         LATBbits.LATB1 = 1;
     } else {
-        txActive = 0;
+        stFlags &= (unsigned char)(~ST_FLAG_TX_ACTIVE);
         return;
     }
 
@@ -147,13 +148,11 @@ void SerialTime_Init (void) {
     CONFIG_SERIAL_TIME;
 
     rxByte = 0;
-    rxReady = 0;
-    rxActive = 0;
+    stFlags = 0;
     rxBitIdx = 0;
     rxShift = 0;
     rxPos = 0;
     rxNext = 0;
-    txActive = 0;
     txBitIdx = 0;
     txShift = 0;
     txPos = 0;
@@ -162,7 +161,6 @@ void SerialTime_Init (void) {
     txPtr = 0;
 
     rxLen = 0;
-    timeConfigured = 0;
 
     currentDate.day = 0;
     currentDate.month = 0;
@@ -183,9 +181,9 @@ void motorSerialTime (void) {
 
     switch (state) {
         case 0:
-            if (rxReady == 1) {
+            if ((stFlags & ST_FLAG_RX_READY) != 0) {
                 c = rxByte;
-                rxReady = 0;
+                stFlags &= (unsigned char)(~ST_FLAG_RX_READY);
 
                 if (c == '\r' || c == '\n') {
                     if (rxLen > 0) {
@@ -307,7 +305,7 @@ void motorSerialTime (void) {
                 currentDate.hour = tempHour;
                 currentDate.minute = tempMinute;
                 currentDate.second = tempSecond;
-                timeConfigured = 1;
+                stFlags |= ST_FLAG_TIME_CONFIGURED;
                 txPtr = "\r\nDate and time correct\r\n";
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -350,11 +348,11 @@ void SerialTime_StartBitISR (void) {
     rxBitIdx = 0;
     rxPos = 0;
     rxNext = 15;
-    rxActive = 1;
+    stFlags |= ST_FLAG_RX_ACTIVE;
 }
 
 void SerialTime_TickISR (void) {
-    if (rxActive == 0) {
+    if ((stFlags & ST_FLAG_RX_ACTIVE) == 0) {
         txTick();
         return;
     }
@@ -375,9 +373,9 @@ void SerialTime_TickISR (void) {
     } else {
         if (PORTBbits.RB2) {
             rxByte = rxShift;
-            rxReady = 1;
+            stFlags |= ST_FLAG_RX_READY;
         }
-        rxActive = 0;
+        stFlags &= (unsigned char)(~ST_FLAG_RX_ACTIVE);
         INTCON3bits.INT2IF = 0;
         INTCON3bits.INT2IE = 1;
     }
@@ -386,11 +384,14 @@ void SerialTime_TickISR (void) {
 }
 
 unsigned char SerialTime_IsConfigured (void) {
-    return timeConfigured;
+    if ((stFlags & ST_FLAG_TIME_CONFIGURED) != 0) {
+        return 1;
+    }
+    return 0;
 }
 
 const STDate *SerialTime_GetDate (void) {
-    if (timeConfigured == 0) {
+    if ((stFlags & ST_FLAG_TIME_CONFIGURED) == 0) {
         return 0;
     }
     return &currentDate;
