@@ -6,8 +6,8 @@
 #include "TAD_TIMER.h"
 
 #define DISPLAY_MESSAGE_TIME 3000UL
+#define DISPLAY_TIMER_HANDLE() ((unsigned char)displayLine[16])
 
-static unsigned char timerHandle;
 static char displayLine[17];
 
 static void Display_PutFixedLine (unsigned char row, const char *text) {
@@ -99,7 +99,6 @@ static void Display_ShowNotification (const FarmNotification *notification) {
         displayLine[index] = ' ';
         index++;
     }
-    displayLine[16] = '\0';
     Display_PutFixedLine(1, displayLine);
 }
 
@@ -135,13 +134,11 @@ static void Display_ShowIdleScreen (void) {
     for (index = 11; index < 16; index++) {
         displayLine[index] = ' ';
     }
-    displayLine[16] = '\0';
-
     Display_ShowText(Farm_GetName(), displayLine);
 }
 
 void Display_Init (void) {
-    TI_NewTimer(&timerHandle);
+    TI_NewTimer((unsigned char *)&displayLine[16]);
 }
 
 void motorDisplay (void) {
@@ -165,7 +162,7 @@ void motorDisplay (void) {
         case 1:
             if (Farm_GetNotification(&notification) == 1) {
                 Display_ShowNotification(&notification);
-                TI_ResetTics(timerHandle);
+                TI_ResetTics(DISPLAY_TIMER_HANDLE());
                 state = 2;
                 break;
             }
@@ -181,10 +178,10 @@ void motorDisplay (void) {
             }
             break;
         case 2:
-            if (TI_GetTics(timerHandle) >= DISPLAY_MESSAGE_TIME) {
+            if (TI_GetTics(DISPLAY_TIMER_HANDLE()) >= DISPLAY_MESSAGE_TIME) {
                 if (Farm_GetNotification(&notification) == 1) {
                     Display_ShowNotification(&notification);
-                    TI_ResetTics(timerHandle);
+                    TI_ResetTics(DISPLAY_TIMER_HANDLE());
                 } else {
                     state = 0;
                 }
