@@ -1,7 +1,6 @@
 #include <xc.h>
 #include "TAD_EEPROM.h"
 
-static unsigned char busy;
 static unsigned char mode;
 static unsigned int clearIndex;
 static unsigned char byteAddr;
@@ -22,7 +21,6 @@ static void launchWrite (unsigned char addr, unsigned char data) {
 }
 
 void EEPROM_Init (void) {
-    busy = 0;
     mode = 0;
     clearIndex = 0;
     byteAddr = 0;
@@ -34,7 +32,7 @@ void motorEEPROM (void) {
 
     switch (state) {
         case 0:
-            if (busy == 1) {
+            if (mode != 0) {
                 state = 1;
             }
             break;
@@ -46,7 +44,6 @@ void motorEEPROM (void) {
             if (mode == 2) {
                 if (clearIndex >= 256U) {
                     EECON1bits.WREN = 0;
-                    busy = 0;
                     mode = 0;
                     state = 0;
                 } else {
@@ -58,12 +55,11 @@ void motorEEPROM (void) {
                 mode = 4;
             } else if (mode == 4) {
                 EECON1bits.WREN = 0;
-                busy = 0;
                 mode = 0;
                 state = 0;
             } else {
                 EECON1bits.WREN = 0;
-                busy = 0;
+                mode = 0;
                 state = 0;
             }
             break;
@@ -79,27 +75,28 @@ unsigned char EEPROM_ReadByte (unsigned char addr) {
 }
 
 unsigned char EEPROM_StartByteWrite (unsigned char addr, unsigned char data) {
-    if (busy == 1) {
+    if (mode != 0) {
         return 0;
     }
 
     byteAddr = addr;
     byteData = data;
     mode = 1;
-    busy = 1;
     return 1;
 }
 
 unsigned char EEPROM_IsBusy (void) {
-    return busy;
+    if (mode != 0) {
+        return 1;
+    }
+    return 0;
 }
 
 void EEPROM_RequestClear (void) {
-    if (busy == 1) {
+    if (mode != 0) {
         return;
     }
 
     clearIndex = 0;
     mode = 2;
-    busy = 1;
 }
