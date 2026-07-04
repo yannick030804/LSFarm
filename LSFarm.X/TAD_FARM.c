@@ -16,6 +16,17 @@
 #define FARM_NOTIFICATION_QUEUE_SIZE 8
 #define ANIMAL_SPECIES_MASK 0x03
 #define ANIMAL_CRITICAL_MASK 0x80
+#define YEAR_SECONDS 31536000UL
+#define PENDING_TIME(species) pendingTimes[(species)]
+#define GENERATION_TIME(species) generationTimes[(species)]
+#define ANIMAL_COUNT(species) animalCounts[(species)]
+#define CRITICAL_COUNT(species) criticalCounts[(species)]
+#define PRODUCT_COUNT(species) productCounts[(species)]
+#define LAST_GENERATION(species) lastGeneration[(species)]
+#define LAST_PRODUCT(species) lastProduct[(species)]
+#define PRODUCT_TIME(species) productTimes[(species)]
+#define ANIMAL_SPECIES(index) ((unsigned char)(animalInfo[(index)] & ANIMAL_SPECIES_MASK))
+#define ANIMAL_IS_CRITICAL(index) ((unsigned char)((animalInfo[(index)] & ANIMAL_CRITICAL_MASK) != 0))
 
 static unsigned char timerHandle;
 static unsigned char configured;
@@ -77,28 +88,12 @@ static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char mon
 static unsigned long Farm_GetCurrentDateStamp (void);
 static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index);
 static void Farm_StoreSleepDate (unsigned char index);
-static unsigned char Farm_GetAnimalSpecies (unsigned char index);
-static unsigned char Farm_IsAnimalCritical (unsigned char index);
 static void Farm_SetAnimalSpecies (unsigned char index, unsigned char species);
 static void Farm_SetAnimalCritical (unsigned char index, unsigned char critical);
-static void Farm_SetNotificationValue (unsigned char index, unsigned char value);
-static unsigned char Farm_GetNotificationValue (unsigned char index);
-static unsigned char Farm_GetPendingTime (unsigned char species);
-static void Farm_SetPendingTime (unsigned char species, unsigned char value);
-static unsigned char Farm_GetGenerationTimeBySpecies (unsigned char species);
-static void Farm_SetGenerationTimeBySpecies (unsigned char species, unsigned char value);
-static unsigned char Farm_GetAnimalCountBySpecies (unsigned char species);
-static void Farm_SetAnimalCountBySpecies (unsigned char species, unsigned char value);
-static unsigned char Farm_GetCriticalCountBySpecies (unsigned char species);
-static void Farm_SetCriticalCountBySpecies (unsigned char species, unsigned char value);
-static unsigned char Farm_GetProductCountBySpecies (unsigned char species);
-static void Farm_SetProductCountBySpecies (unsigned char species, unsigned char value);
-static unsigned char Farm_GetLastGenerationBySpecies (unsigned char species);
-static void Farm_SetLastGenerationBySpecies (unsigned char species, unsigned char value);
-static unsigned char Farm_GetLastProductBySpecies (unsigned char species);
-static void Farm_SetLastProductBySpecies (unsigned char species, unsigned char value);
-static unsigned char Farm_GetProductTimeBySpecies (unsigned char species);
+static void Farm_ClearAnimals (void);
+static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes);
 static const unsigned char productTimes[FARM_NUM_SPECIES] = {47, 31, 23, 13};
+static const unsigned int monthOffsets[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
 
 void Farm_Init (void) {
     TI_NewTimer(&timerHandle);
@@ -144,10 +139,10 @@ void motorFarm (void) {
 
         case 2:
             Farm_ClearCurrentData();
-            Farm_SetGenerationTimeBySpecies(SPECIES_COW, Farm_GetPendingTime(SPECIES_COW));
-            Farm_SetGenerationTimeBySpecies(SPECIES_PIG, Farm_GetPendingTime(SPECIES_PIG));
-            Farm_SetGenerationTimeBySpecies(SPECIES_HORSE, Farm_GetPendingTime(SPECIES_HORSE));
-            Farm_SetGenerationTimeBySpecies(SPECIES_CHICKEN, Farm_GetPendingTime(SPECIES_CHICKEN));
+            GENERATION_TIME(SPECIES_COW) = PENDING_TIME(SPECIES_COW);
+            GENERATION_TIME(SPECIES_PIG) = PENDING_TIME(SPECIES_PIG);
+            GENERATION_TIME(SPECIES_HORSE) = PENDING_TIME(SPECIES_HORSE);
+            GENERATION_TIME(SPECIES_CHICKEN) = PENDING_TIME(SPECIES_CHICKEN);
             configured = 1;
             configRequested = 0;
             Farm_MarkDirty();
@@ -203,10 +198,10 @@ void motorFarm (void) {
 
         case 7:
             if (animalIndex < totalAnimals) {
-                if (Farm_GetAnimalSpecies(animalIndex) == selectedAnimalSpecies) {
+                if (ANIMAL_SPECIES(animalIndex) == selectedAnimalSpecies) {
                     speciesNumber++;
                 }
-                if (Farm_GetAnimalSpecies(animalIndex) == selectedAnimalSpecies && speciesNumber == selectedAnimalNumber) {
+                if (ANIMAL_SPECIES(animalIndex) == selectedAnimalSpecies && speciesNumber == selectedAnimalNumber) {
                     selectedAnimalIndex = (signed char)animalIndex;
                     searchFound = 1;
                     searchFinished = 1;
@@ -235,10 +230,10 @@ void Farm_Reset (void) {
 
 void Farm_RequestConfigure (const char *name, unsigned char cow, unsigned char horse, unsigned char pig, unsigned char chicken) {
     pendingName = name;
-    Farm_SetPendingTime(SPECIES_COW, cow);
-    Farm_SetPendingTime(SPECIES_HORSE, horse);
-    Farm_SetPendingTime(SPECIES_PIG, pig);
-    Farm_SetPendingTime(SPECIES_CHICKEN, chicken);
+    PENDING_TIME(SPECIES_COW) = cow;
+    PENDING_TIME(SPECIES_HORSE) = horse;
+    PENDING_TIME(SPECIES_PIG) = pig;
+    PENDING_TIME(SPECIES_CHICKEN) = chicken;
     Farm_ResetSelectionState();
     configRequested = 1;
     configured = 0;
@@ -288,12 +283,12 @@ void Farm_NotifyRestSuccess (void) {
     }
 
     index = (unsigned char)selectedAnimalIndex;
-    species = Farm_GetAnimalSpecies(index);
+    species = ANIMAL_SPECIES(index);
 
-    if (Farm_IsAnimalCritical(index) == 1) {
+    if (ANIMAL_IS_CRITICAL(index) == 1) {
         Farm_SetAnimalCritical(index, 0);
-        if (Farm_GetCriticalCountBySpecies(species) > 0) {
-            Farm_SetCriticalCountBySpecies(species, (unsigned char)(Farm_GetCriticalCountBySpecies(species) - 1));
+        if (CRITICAL_COUNT(species) > 0) {
+            CRITICAL_COUNT(species)--;
         }
     }
 
@@ -332,11 +327,11 @@ void Farm_GetAnimal (unsigned char index, unsigned char *species, unsigned char 
     unsigned char i;
     unsigned char count = 0;
 
-    *species = Farm_GetAnimalSpecies(index);
-    *critical = Farm_IsAnimalCritical(index);
+    *species = ANIMAL_SPECIES(index);
+    *critical = ANIMAL_IS_CRITICAL(index);
 
     for (i = 0; i <= index; i++) {
-        if (Farm_GetAnimalSpecies(i) == *species) {
+        if (ANIMAL_SPECIES(i) == *species) {
             count++;
         }
     }
@@ -345,7 +340,7 @@ void Farm_GetAnimal (unsigned char index, unsigned char *species, unsigned char 
 }
 
 unsigned char Farm_GetProductTotal (unsigned char species) {
-    return Farm_GetProductCountBySpecies(species);
+    return PRODUCT_COUNT(species);
 }
 
 void Farm_SetRebellion (unsigned char active) {
@@ -378,7 +373,7 @@ unsigned char Farm_GetNotification (FarmNotification *notification) {
 
     notification->kind = (unsigned char)(notificationMeta[notificationHead] >> 2);
     notification->species = (unsigned char)(notificationMeta[notificationHead] & 0x03);
-    notification->number = Farm_GetNotificationValue(notificationHead);
+    notification->number = notificationValues[notificationHead];
     notificationHead++;
     if (notificationHead >= FARM_NOTIFICATION_QUEUE_SIZE) {
         notificationHead = 0;
@@ -414,7 +409,7 @@ unsigned char Farm_ExportByte (unsigned char index) {
 
     index = (unsigned char)(index - (FARM_MAX_NAME + 1));
     if (index < FARM_NUM_SPECIES) {
-        return Farm_GetGenerationTimeBySpecies(index);
+        return GENERATION_TIME(index);
     }
 
     index = (unsigned char)(index - FARM_NUM_SPECIES);
@@ -424,7 +419,7 @@ unsigned char Farm_ExportByte (unsigned char index) {
 
     index--;
     if (index < FARM_NUM_SPECIES) {
-        return Farm_GetProductCountBySpecies(index);
+        return PRODUCT_COUNT(index);
     }
 
     index = (unsigned char)(index - FARM_NUM_SPECIES);
@@ -458,7 +453,7 @@ void Farm_ImportStateByte (unsigned char index, unsigned char value) {
 
     index = (unsigned char)(index - (FARM_MAX_NAME + 1));
     if (index < FARM_NUM_SPECIES) {
-        Farm_SetGenerationTimeBySpecies(index, value);
+        GENERATION_TIME(index) = value;
         return;
     }
 
@@ -470,7 +465,7 @@ void Farm_ImportStateByte (unsigned char index, unsigned char value) {
 
     index--;
     if (index < FARM_NUM_SPECIES) {
-        Farm_SetProductCountBySpecies(index, value);
+        PRODUCT_COUNT(index) = value;
         return;
     }
 
@@ -501,7 +496,7 @@ void Farm_EndImportState (void) {
 
     farmName[FARM_MAX_NAME] = '\0';
     for (i = 0; i < FARM_MAX_ANIMALS; i++) {
-        if (Farm_GetAnimalSpecies(i) >= FARM_NUM_SPECIES) {
+        if (ANIMAL_SPECIES(i) >= FARM_NUM_SPECIES) {
             Farm_SetAnimalSpecies(i, SPECIES_COW);
         }
         Farm_SetAnimalCritical(i, 0);
@@ -542,19 +537,10 @@ static void resetFarmData (void) {
     Farm_ResetSelectionState();
 
     for (i = 0; i < FARM_NUM_SPECIES; i++) {
-        Farm_SetPendingTime(i, 0);
-        Farm_SetGenerationTimeBySpecies(i, 0);
-        Farm_SetAnimalCountBySpecies(i, 0);
-        Farm_SetCriticalCountBySpecies(i, 0);
-        Farm_SetProductCountBySpecies(i, 0);
-        Farm_SetLastGenerationBySpecies(i, 0);
-        Farm_SetLastProductBySpecies(i, 0);
+        PENDING_TIME(i) = 0;
     }
-
-    for (i = 0; i < FARM_MAX_ANIMALS; i++) {
-        animalInfo[i] = 0;
-        animalSleepStamp[i] = 0;
-    }
+    Farm_ClearSpeciesData(1);
+    Farm_ClearAnimals();
 }
 
 static void Farm_ClearCurrentData (void) {
@@ -566,33 +552,22 @@ static void Farm_ClearCurrentData (void) {
     rebellion = 0;
     dirtyState = 0;
     Farm_ResetSelectionState();
-
-    for (i = 0; i < FARM_NUM_SPECIES; i++) {
-        Farm_SetAnimalCountBySpecies(i, 0);
-        Farm_SetCriticalCountBySpecies(i, 0);
-        Farm_SetProductCountBySpecies(i, 0);
-        Farm_SetLastGenerationBySpecies(i, 0);
-        Farm_SetLastProductBySpecies(i, 0);
-    }
-
-    for (i = 0; i < FARM_MAX_ANIMALS; i++) {
-        animalInfo[i] = 0;
-        animalSleepStamp[i] = 0;
-    }
+    Farm_ClearSpeciesData(0);
+    Farm_ClearAnimals();
 }
 
 static void Farm_RecountAnimals (void) {
     unsigned char i;
 
     for (i = 0; i < FARM_NUM_SPECIES; i++) {
-        Farm_SetAnimalCountBySpecies(i, 0);
-        Farm_SetCriticalCountBySpecies(i, 0);
+        ANIMAL_COUNT(i) = 0;
+        CRITICAL_COUNT(i) = 0;
     }
 
     for (i = 0; i < totalAnimals; i++) {
-        Farm_SetAnimalCountBySpecies(Farm_GetAnimalSpecies(i), (unsigned char)(Farm_GetAnimalCountBySpecies(Farm_GetAnimalSpecies(i)) + 1));
-        if (Farm_IsAnimalCritical(i) == 1) {
-            Farm_SetCriticalCountBySpecies(Farm_GetAnimalSpecies(i), (unsigned char)(Farm_GetCriticalCountBySpecies(Farm_GetAnimalSpecies(i)) + 1));
+        ANIMAL_COUNT(ANIMAL_SPECIES(i))++;
+        if (ANIMAL_IS_CRITICAL(i) == 1) {
+            CRITICAL_COUNT(ANIMAL_SPECIES(i))++;
         }
     }
 }
@@ -614,7 +589,7 @@ static void Farm_PushNotification (unsigned char kind, unsigned char species, un
     }
 
     notificationMeta[tail] = (unsigned char)(((kind & 0x3F) << 2) | (species & 0x03));
-    Farm_SetNotificationValue(tail, number);
+    notificationValues[tail] = number;
     notificationCount++;
 }
 
@@ -627,7 +602,7 @@ static unsigned char Farm_CreateAnimal (unsigned char species) {
     }
 
     for (i = 0; i < FARM_NUM_SPECIES; i++) {
-        unsigned char count = Farm_GetAnimalCountBySpecies(i);
+        unsigned char count = ANIMAL_COUNT(i);
         if (i == species) {
             count++;
         }
@@ -649,27 +624,27 @@ static unsigned char Farm_CreateAnimal (unsigned char species) {
 }
 
 static unsigned char Farm_GetAwakeCount (unsigned char species) {
-    return (unsigned char)(Farm_GetAnimalCountBySpecies(species) - Farm_GetCriticalCountBySpecies(species));
+    return (unsigned char)(ANIMAL_COUNT(species) - CRITICAL_COUNT(species));
 }
 
 static void Farm_TakeProduct (unsigned char species, unsigned char amount) {
-    if (Farm_GetProductCountBySpecies(species) >= amount) {
-        Farm_SetProductCountBySpecies(species, (unsigned char)(Farm_GetProductCountBySpecies(species) - amount));
+    if (PRODUCT_COUNT(species) >= amount) {
+        PRODUCT_COUNT(species) = (unsigned char)(PRODUCT_COUNT(species) - amount);
     }
 }
 
 static void Farm_ProcessGeneration (unsigned char species, unsigned char now) {
-    if (Farm_GetGenerationTimeBySpecies(species) == 0) {
+    if (GENERATION_TIME(species) == 0) {
         return;
     }
 
-    if ((unsigned char)(now - Farm_GetLastGenerationBySpecies(species)) >= Farm_GetGenerationTimeBySpecies(species)) {
+    if ((unsigned char)(now - LAST_GENERATION(species)) >= GENERATION_TIME(species)) {
         if (Farm_CreateAnimal(species) == 1) {
-            Farm_SetAnimalCountBySpecies(species, (unsigned char)(Farm_GetAnimalCountBySpecies(species) + 1));
-            Farm_PushNotification(FARM_NOTIFICATION_ANIMAL, species, Farm_GetAnimalCountBySpecies(species));
+            ANIMAL_COUNT(species)++;
+            Farm_PushNotification(FARM_NOTIFICATION_ANIMAL, species, ANIMAL_COUNT(species));
             Farm_MarkDirty();
         }
-        Farm_SetLastGenerationBySpecies(species, now);
+        LAST_GENERATION(species) = now;
     }
 }
 
@@ -680,27 +655,27 @@ static void Farm_ProcessProducts (unsigned char species, unsigned char now) {
         return;
     }
 
-    if ((unsigned char)(now - Farm_GetLastProductBySpecies(species)) < Farm_GetProductTimeBySpecies(species)) {
+    if ((unsigned char)(now - LAST_PRODUCT(species)) < PRODUCT_TIME(species)) {
         return;
     }
 
     awakeCount = Farm_GetAwakeCount(species);
     if (awakeCount > 0) {
-        if ((unsigned int)Farm_GetProductCountBySpecies(species) + awakeCount > 255) {
-            Farm_SetProductCountBySpecies(species, 255);
+        if ((unsigned int)PRODUCT_COUNT(species) + awakeCount > 255) {
+            PRODUCT_COUNT(species) = 255;
         } else {
-            Farm_SetProductCountBySpecies(species, (unsigned char)(Farm_GetProductCountBySpecies(species) + awakeCount));
+            PRODUCT_COUNT(species) = (unsigned char)(PRODUCT_COUNT(species) + awakeCount);
         }
-        Farm_PushNotification(FARM_NOTIFICATION_PRODUCT, species, Farm_GetProductCountBySpecies(species));
+        Farm_PushNotification(FARM_NOTIFICATION_PRODUCT, species, PRODUCT_COUNT(species));
         Farm_MarkDirty();
     }
-    Farm_SetLastProductBySpecies(species, now);
+    LAST_PRODUCT(species) = now;
 }
 
 static void Farm_ProcessCriticalAnimal (unsigned char index) {
     unsigned char species;
 
-    if (Farm_IsAnimalCritical(index) == 1) {
+    if (ANIMAL_IS_CRITICAL(index) == 1) {
         return;
     }
 
@@ -712,9 +687,9 @@ static void Farm_ProcessCriticalAnimal (unsigned char index) {
         return;
     }
 
-    species = Farm_GetAnimalSpecies(index);
+    species = ANIMAL_SPECIES(index);
     Farm_SetAnimalCritical(index, 1);
-    Farm_SetCriticalCountBySpecies(species, (unsigned char)(Farm_GetCriticalCountBySpecies(species) + 1));
+    CRITICAL_COUNT(species)++;
     Farm_MarkDirty();
 }
 
@@ -731,25 +706,17 @@ static void Farm_ResetSelectionState (void) {
 }
 
 static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second) {
-    static const unsigned char daysPerMonth[12] = {
-        31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
-    };
-    unsigned char i;
-    unsigned long totalDays = 0;
-
     if (month == 0) {
         month = 1;
     }
     if (day == 0) {
         day = 1;
     }
-
-    for (i = 1; i < month && i <= 12; i++) {
-        totalDays += daysPerMonth[i - 1];
+    if (month > 12) {
+        month = 12;
     }
-    totalDays += (unsigned long)(day - 1);
 
-    return (((totalDays * 24UL) + hour) * 60UL + minute) * 60UL + second;
+    return (((((unsigned long)monthOffsets[month - 1] + (unsigned long)(day - 1)) * 24UL) + hour) * 60UL + minute) * 60UL + second;
 }
 
 static unsigned long Farm_GetCurrentDateStamp (void) {
@@ -759,7 +726,6 @@ static unsigned long Farm_GetCurrentDateStamp (void) {
 static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index) {
     unsigned long currentTotal;
     unsigned long sleepTotal;
-    const unsigned long yearSeconds = 31536000UL;
 
     currentTotal = Farm_GetCurrentDateStamp();
     sleepTotal = animalSleepStamp[index];
@@ -768,22 +734,11 @@ static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index) {
         return currentTotal - sleepTotal;
     }
 
-    return (yearSeconds - sleepTotal) + currentTotal;
+    return (YEAR_SECONDS - sleepTotal) + currentTotal;
 }
 
 static void Farm_StoreSleepDate (unsigned char index) {
     animalSleepStamp[index] = Farm_GetCurrentDateStamp();
-}
-
-static unsigned char Farm_GetAnimalSpecies (unsigned char index) {
-    return (unsigned char)(animalInfo[index] & ANIMAL_SPECIES_MASK);
-}
-
-static unsigned char Farm_IsAnimalCritical (unsigned char index) {
-    if ((animalInfo[index] & ANIMAL_CRITICAL_MASK) != 0) {
-        return 1;
-    }
-    return 0;
 }
 
 static void Farm_SetAnimalSpecies (unsigned char index, unsigned char species) {
@@ -798,70 +753,26 @@ static void Farm_SetAnimalCritical (unsigned char index, unsigned char critical)
     }
 }
 
-static unsigned char Farm_GetPendingTime (unsigned char species) {
-    return pendingTimes[species];
+static void Farm_ClearAnimals (void) {
+    unsigned char i;
+
+    for (i = 0; i < FARM_MAX_ANIMALS; i++) {
+        animalInfo[i] = 0;
+        animalSleepStamp[i] = 0;
+    }
 }
 
-static void Farm_SetPendingTime (unsigned char species, unsigned char value) {
-    pendingTimes[species] = value;
-}
+static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes) {
+    unsigned char i;
 
-static unsigned char Farm_GetGenerationTimeBySpecies (unsigned char species) {
-    return generationTimes[species];
-}
-
-static void Farm_SetGenerationTimeBySpecies (unsigned char species, unsigned char value) {
-    generationTimes[species] = value;
-}
-
-static unsigned char Farm_GetAnimalCountBySpecies (unsigned char species) {
-    return animalCounts[species];
-}
-
-static void Farm_SetAnimalCountBySpecies (unsigned char species, unsigned char value) {
-    animalCounts[species] = value;
-}
-
-static unsigned char Farm_GetCriticalCountBySpecies (unsigned char species) {
-    return criticalCounts[species];
-}
-
-static void Farm_SetCriticalCountBySpecies (unsigned char species, unsigned char value) {
-    criticalCounts[species] = value;
-}
-
-static unsigned char Farm_GetProductCountBySpecies (unsigned char species) {
-    return productCounts[species];
-}
-
-static void Farm_SetProductCountBySpecies (unsigned char species, unsigned char value) {
-    productCounts[species] = value;
-}
-
-static unsigned char Farm_GetLastGenerationBySpecies (unsigned char species) {
-    return lastGeneration[species];
-}
-
-static void Farm_SetLastGenerationBySpecies (unsigned char species, unsigned char value) {
-    lastGeneration[species] = value;
-}
-
-static unsigned char Farm_GetLastProductBySpecies (unsigned char species) {
-    return lastProduct[species];
-}
-
-static void Farm_SetLastProductBySpecies (unsigned char species, unsigned char value) {
-    lastProduct[species] = value;
-}
-
-static unsigned char Farm_GetProductTimeBySpecies (unsigned char species) {
-    return productTimes[species];
-}
-
-static void Farm_SetNotificationValue (unsigned char index, unsigned char value) {
-    notificationValues[index] = value;
-}
-
-static unsigned char Farm_GetNotificationValue (unsigned char index) {
-    return notificationValues[index];
+    for (i = 0; i < FARM_NUM_SPECIES; i++) {
+        ANIMAL_COUNT(i) = 0;
+        CRITICAL_COUNT(i) = 0;
+        PRODUCT_COUNT(i) = 0;
+        LAST_GENERATION(i) = 0;
+        LAST_PRODUCT(i) = 0;
+        if (clearGenerationTimes == 1) {
+            GENERATION_TIME(i) = 0;
+        }
+    }
 }
