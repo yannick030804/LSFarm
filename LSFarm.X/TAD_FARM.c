@@ -78,8 +78,14 @@ static unsigned char lastProductChicken;
 static unsigned char animalInfo[FARM_MAX_ANIMALS];
 static unsigned long animalSleepStamp[FARM_MAX_ANIMALS];
 static unsigned char notificationMeta[FARM_NOTIFICATION_QUEUE_SIZE];
-static unsigned char notificationValueA[4];
-static unsigned char notificationValueB[4];
+static unsigned char notificationValue0;
+static unsigned char notificationValue1;
+static unsigned char notificationValue2;
+static unsigned char notificationValue3;
+static unsigned char notificationValue4;
+static unsigned char notificationValue5;
+static unsigned char notificationValue6;
+static unsigned char notificationValue7;
 static unsigned char notificationHead;
 static unsigned char notificationCount;
 
@@ -1001,16 +1007,27 @@ static unsigned char Farm_GetProductTimeBySpecies (unsigned char species) {
 }
 
 static void Farm_SetNotificationValue (unsigned char index, unsigned char value) {
-    if (index < 4) {
-        notificationValueA[index] = value;
-    } else {
-        notificationValueB[index - 4] = value;
+    switch (index) {
+        case 0: notificationValue0 = value; break;
+        case 1: notificationValue1 = value; break;
+        case 2: notificationValue2 = value; break;
+        case 3: notificationValue3 = value; break;
+        case 4: notificationValue4 = value; break;
+        case 5: notificationValue5 = value; break;
+        case 6: notificationValue6 = value; break;
+        default: notificationValue7 = value; break;
     }
 }
 
 static unsigned char Farm_GetNotificationValue (unsigned char index) {
-    if (index < 4) {
-        return notificationValueA[index];
+    switch (index) {
+        case 0: return notificationValue0;
+        case 1: return notificationValue1;
+        case 2: return notificationValue2;
+        case 3: return notificationValue3;
+        case 4: return notificationValue4;
+        case 5: return notificationValue5;
+        case 6: return notificationValue6;
+        default: return notificationValue7;
     }
-    return notificationValueB[index - 4];
 }
