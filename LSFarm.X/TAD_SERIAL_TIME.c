@@ -39,6 +39,11 @@ static char rxChar13;
 static unsigned char rxLen;
 static unsigned char timeConfigured;
 static STDate currentDate;
+static unsigned char tempDay;
+static unsigned char tempMonth;
+static unsigned char tempHour;
+static unsigned char tempMinute;
+static unsigned char tempSecond;
 
 static void setRxChar (unsigned char index, char c) {
     switch (index) {
@@ -174,7 +179,6 @@ void SerialTime_Init (void) {
 
 void motorSerialTime (void) {
     static unsigned char state = 0;
-    static STDate tempDate;
     unsigned char c;
 
     switch (state) {
@@ -197,11 +201,11 @@ void motorSerialTime (void) {
             }
             break;
         case 1:
-            tempDate.day = 0;
-            tempDate.month = 0;
-            tempDate.hour = 0;
-            tempDate.minute = 0;
-            tempDate.second = 0;
+            tempDay = 0;
+            tempMonth = 0;
+            tempHour = 0;
+            tempMinute = 0;
+            tempSecond = 0;
             if (rxLen == SERIAL_TIME_LINE_MAX) {
                 state = 2;
             } else {
@@ -212,7 +216,7 @@ void motorSerialTime (void) {
             break;
         case 2:
             if (isDigit(getRxChar(0)) && isDigit(getRxChar(1))) {
-                tempDate.day = parseTwoDigits(0);
+                tempDay = parseTwoDigits(0);
                 state = 3;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -231,7 +235,7 @@ void motorSerialTime (void) {
             break;
         case 4:
             if (isDigit(getRxChar(3)) && isDigit(getRxChar(4))) {
-                tempDate.month = parseTwoDigits(3);
+                tempMonth = parseTwoDigits(3);
                 state = 5;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -250,7 +254,7 @@ void motorSerialTime (void) {
             break;
         case 6:
             if (isDigit(getRxChar(6)) && isDigit(getRxChar(7))) {
-                tempDate.hour = parseTwoDigits(6);
+                tempHour = parseTwoDigits(6);
                 state = 7;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -269,7 +273,7 @@ void motorSerialTime (void) {
             break;
         case 8:
             if (isDigit(getRxChar(9)) && isDigit(getRxChar(10))) {
-                tempDate.minute = parseTwoDigits(9);
+                tempMinute = parseTwoDigits(9);
                 state = 9;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -288,7 +292,7 @@ void motorSerialTime (void) {
             break;
         case 10:
             if (isDigit(getRxChar(12)) && isDigit(getRxChar(13))) {
-                tempDate.second = parseTwoDigits(12);
+                tempSecond = parseTwoDigits(12);
                 state = 11;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -297,8 +301,12 @@ void motorSerialTime (void) {
             }
             break;
         case 11:
-            if (tempDate.day >= 1 && tempDate.day <= 31 && tempDate.month >= 1 && tempDate.month <= 12 && tempDate.hour <= 23 && tempDate.minute <= 59 && tempDate.second <= 59) {
-                currentDate = tempDate;
+            if (tempDay >= 1 && tempDay <= 31 && tempMonth >= 1 && tempMonth <= 12 && tempHour <= 23 && tempMinute <= 59 && tempSecond <= 59) {
+                currentDate.day = tempDay;
+                currentDate.month = tempMonth;
+                currentDate.hour = tempHour;
+                currentDate.minute = tempMinute;
+                currentDate.second = tempSecond;
                 timeConfigured = 1;
                 txPtr = "\r\nDate and time correct\r\n";
             } else {
