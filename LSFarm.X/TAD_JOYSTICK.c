@@ -2,15 +2,21 @@
 #include "TAD_JOYSTICK.h"
 #include "TAD_ADC.h"
 
+#define JOY_LAST_MASK   0x0F
+#define JOY_PENDING_MASK 0xF0
+#define JOY_GET_LAST() ((unsigned char)(joyPacked & JOY_LAST_MASK))
+#define JOY_SET_LAST(value) (joyPacked = (unsigned char)((joyPacked & JOY_PENDING_MASK) | ((value) & JOY_LAST_MASK)))
+#define JOY_GET_PENDING() ((unsigned char)((joyPacked >> 4) & 0x0F))
+#define JOY_SET_PENDING(value) (joyPacked = (unsigned char)((joyPacked & JOY_LAST_MASK) | (((value) & 0x0F) << 4)))
+
 static unsigned char adcX;
 static unsigned char adcY;
-static unsigned char pendingEvent;
-static unsigned char lastDirection;
+static unsigned char joyPacked;
 
 static void processJoystick (void) {
     unsigned char newDirection = JOY_EVT_NONE;
 
-    if (pendingEvent != JOY_EVT_NONE) {
+    if (JOY_GET_PENDING() != JOY_EVT_NONE) {
         return;
     }
 
@@ -24,10 +30,10 @@ static void processJoystick (void) {
         newDirection = JOY_EVT_UP;
     }
 
-    if (newDirection != lastDirection) {
-        lastDirection = newDirection;
+    if (newDirection != JOY_GET_LAST()) {
+        JOY_SET_LAST(newDirection);
         if (newDirection != JOY_EVT_NONE) {
-            pendingEvent = newDirection;
+            JOY_SET_PENDING(newDirection);
         }
     }
 }
@@ -36,8 +42,7 @@ void Joystick_Init(void) {
     CONFIG_JOYSTICK;
     adcX = 128;
     adcY = 128;
-    pendingEvent = JOY_EVT_NONE;
-    lastDirection = JOY_EVT_NONE;
+    joyPacked = 0;
 }
 
 void motorJoystick (void) {
@@ -74,8 +79,8 @@ void motorJoystick (void) {
 }
 
 unsigned char Joystick_GetEvent (void) {
-    unsigned char event = pendingEvent;
+    unsigned char event = JOY_GET_PENDING();
 
-    pendingEvent = JOY_EVT_NONE;
+    JOY_SET_PENDING(JOY_EVT_NONE);
     return event;
 }

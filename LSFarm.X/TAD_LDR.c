@@ -10,13 +10,11 @@
 
 static unsigned char timerHandle;
 static unsigned char lightLevel;
-static unsigned char covered;
 
 void LDR_Init (void) {
     CONFIG_LDR;
     TI_NewTimer(&timerHandle);
     lightLevel = 255;
-    covered = 0;
 }
 
 void motorLDR (void) {
@@ -31,7 +29,6 @@ void motorLDR (void) {
             break;
         case 1:
             if (Farm_IsRestRequestPending() == 0) {
-                covered = 0;
                 state = 0;
                 break;
             }
@@ -41,15 +38,13 @@ void motorLDR (void) {
             break;
         case 2:
             if (Farm_IsRestRequestPending() == 0) {
-                covered = 0;
                 state = 0;
                 break;
             }
             if (ADC_IsDone() == 1) {
                 lightLevel = ADC_Read();
-                covered = (lightLevel < LDR_COVER_THRESHOLD);
 
-                if (covered == 1) {
+                if (lightLevel < LDR_COVER_THRESHOLD) {
                     Farm_NotifyRestSuccess();
                     state = 0;
                 } else if (TI_GetTics(timerHandle) >= LDR_TIMEOUT_MS) {
@@ -61,8 +56,4 @@ void motorLDR (void) {
             }
             break;
     }
-}
-
-unsigned char LDR_IsCovered (void) {
-    return covered;
 }

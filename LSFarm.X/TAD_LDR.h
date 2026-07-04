@@ -5,6 +5,5 @@
 
 void LDR_Init (void);
 void motorLDR (void);
-unsigned char LDR_IsCovered (void);
 
 #endif

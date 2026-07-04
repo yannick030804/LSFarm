@@ -9,6 +9,10 @@
 #include "TAD_SERIAL_TIME.h"
 
 #define FARM_STATE_MAGIC 0xA5
+#define CTRL_FLAG_INIT_SENT         0x01
+#define CTRL_FLAG_PERSISTENCE_LOADED 0x02
+#define CTRL_FLAG_RESET_PENDING     0x04
+#define CTRL_FLAG_SAVE_ACTIVE       0x08
 
 static const char *line;
 static const char *txLine;
@@ -20,16 +24,12 @@ static unsigned char param3;
 static unsigned char param4;
 static unsigned char selectedNumber;
 static unsigned char selectedSpecies;
-static unsigned char selectHasDigits;
 static unsigned char sleepTypeStart;
-static unsigned char initRequestSent;
 static unsigned char joystickEvent;
 static unsigned char animalIndex;
 static unsigned char recipeId;
 static char txBuffer[21];
-static unsigned char persistenceLoaded;
-static unsigned char resetPersistencePending;
-static unsigned char persistenceSaveActive;
+static unsigned char controllerFlags;
 static unsigned char persistenceIndex;
 
 static void resetInitData (void) {
@@ -41,9 +41,8 @@ static void resetInitData (void) {
     param4 = 0;
     selectedNumber = 0;
     selectedSpecies = 255;
-    selectHasDigits = 0;
     sleepTypeStart = 0;
-    initRequestSent = 0;
+    controllerFlags &= (unsigned char)(~CTRL_FLAG_INIT_SENT);
 }
 
 static unsigned char isDigit (char c) {
@@ -124,7 +123,7 @@ static void Controller_ServiceFarm (void) {
         Farm_SetCurrentDate(0, 0, 0, 0, 0, 0);
     }
 
-    if (persistenceLoaded == 0 && EEPROM_IsBusy() == 0) {
+    if ((controllerFlags & CTRL_FLAG_PERSISTENCE_LOADED) == 0 && EEPROM_IsBusy() == 0) {
         if (EEPROM_ReadByte(0) == FARM_STATE_MAGIC) {
             Farm_BeginImportState();
             for (persistenceIndex = 0; persistenceIndex < FARM_STATE_SIZE; persistenceIndex++) {
@@ -132,16 +131,16 @@ static void Controller_ServiceFarm (void) {
             }
             Farm_EndImportState();
         }
-        persistenceLoaded = 1;
+        controllerFlags |= CTRL_FLAG_PERSISTENCE_LOADED;
     }
 
-    if (resetPersistencePending == 1 && EEPROM_IsBusy() == 0) {
+    if ((controllerFlags & CTRL_FLAG_RESET_PENDING) != 0 && EEPROM_IsBusy() == 0) {
         EEPROM_RequestClear();
-        resetPersistencePending = 0;
+        controllerFlags &= (unsigned char)(~CTRL_FLAG_RESET_PENDING);
         return;
     }
 
-    if (persistenceSaveActive == 1 && EEPROM_IsBusy() == 0) {
+    if ((controllerFlags & CTRL_FLAG_SAVE_ACTIVE) != 0 && EEPROM_IsBusy() == 0) {
         if (persistenceIndex == 0) {
             if (EEPROM_StartByteWrite(0, FARM_STATE_MAGIC) == 1) {
                 persistenceIndex = 1;
@@ -151,14 +150,14 @@ static void Controller_ServiceFarm (void) {
                 persistenceIndex++;
             }
         } else {
-            persistenceSaveActive = 0;
+            controllerFlags &= (unsigned char)(~CTRL_FLAG_SAVE_ACTIVE);
             Farm_ClearDirty();
         }
         return;
     }
 
     if (Farm_IsDirty() == 1 && EEPROM_IsBusy() == 0 && Farm_IsConfigured() == 1) {
-        persistenceSaveActive = 1;
+        controllerFlags |= CTRL_FLAG_SAVE_ACTIVE;
         persistenceIndex = 0;
     }
 }
@@ -240,9 +239,7 @@ static void buildAnimalLine (unsigned char indexAnimal) {
 
 void Controller_Init (void) {
     resetInitData();
-    persistenceLoaded = 0;
-    resetPersistencePending = 0;
-    persistenceSaveActive = 0;
+    controllerFlags = 0;
     persistenceIndex = 0;
 }
 
@@ -281,7 +278,7 @@ void motorController (void) {
             } else if (line[0] == 'R' && line[1] == '\0') {
                 Farm_Reset();
                 Heartbeat_SetRebellion(0);
-                resetPersistencePending = 1;
+                controllerFlags |= CTRL_FLAG_RESET_PENDING;
                 txLine = "RESET OK\r\n";
                 state = 20;
             } else if (line[0] == 'B' && line[1] == '\0') {
@@ -300,7 +297,6 @@ void motorController (void) {
             } else if (line[0] == 'S' && line[1] == ':') {
                 selectedNumber = 0;
                 selectedSpecies = 255;
-                selectHasDigits = 0;
                 i = 2;
                 sleepTypeStart = 2;
                 state = 9;
@@ -371,9 +367,9 @@ void motorController (void) {
                 state = 8;
                 break;
             }
-            if (initRequestSent == 0) {
+            if ((controllerFlags & CTRL_FLAG_INIT_SENT) == 0) {
                 Farm_RequestConfigure(farmName, param1, param2, param3, param4);
-                initRequestSent = 1;
+                controllerFlags |= CTRL_FLAG_INIT_SENT;
             }
             if (Farm_IsConfigured() == 1) {
                 txLine = "INIT OK\r\n";
@@ -405,9 +401,8 @@ void motorController (void) {
         case 10:
             if (isDigit(line[i])) {
                 selectedNumber = selectedNumber * 10 + (line[i] - '0');
-                selectHasDigits = 1;
                 i++;
-            } else if (line[i] == '\0' && selectHasDigits == 1 && selectedNumber > 0) {
+            } else if (line[i] == '\0' && selectedNumber > 0) {
                 Farm_RequestSelectAnimal(selectedSpecies, selectedNumber);
                 state = 11;
             } else {
