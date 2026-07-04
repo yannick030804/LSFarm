@@ -1,7 +1,7 @@
 #ifndef TAD_FARM_H
 #define TAD_FARM_H
 
-#define FARM_STATE_SIZE 171
+#define FARM_STATE_SIZE 146
 
 typedef struct {
     unsigned char kind;

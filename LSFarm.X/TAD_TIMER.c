@@ -12,12 +12,10 @@
 #define T0CON_CONFIG 0x88
 #define RECARREGA_TMR0 63036 // 1 ms con Fosc = 10 MHz
 
-#define TI_NUMTIMERS 10
+#define TI_NUMTIMERS 7
 
-struct Timer {
-    unsigned long TicsInicials;
-    unsigned char Busy;
-} static Timers[TI_NUMTIMERS];
+static unsigned long TimerStarts[TI_NUMTIMERS];
+static unsigned char TimerBusyMask;
 
 static volatile unsigned long Tics = 0;
 
@@ -29,8 +27,9 @@ void RSI_Timer0 () {
 
 void TI_Init () {
     for (unsigned char counter = 0; counter < TI_NUMTIMERS; counter++) {
-        Timers[counter].Busy = TI_FALS;
+        TimerStarts[counter] = 0;
     }
+    TimerBusyMask = 0;
     T0CON = T0CON_CONFIG;
     TMR0 = RECARREGA_TMR0;
     INTCONbits.TMR0IF = 0;
@@ -41,17 +40,17 @@ void TI_Init () {
 
 unsigned char TI_NewTimer (unsigned char *TimerHandle) {
     unsigned char Comptador = 0;
-    while(Timers[Comptador].Busy == TI_CERT) {
+    while((TimerBusyMask & (1u << Comptador)) != 0) {
         if(++Comptador == TI_NUMTIMERS) return (TI_FALS);
     }
-    Timers[Comptador].Busy = TI_CERT;
+    TimerBusyMask |= (unsigned char)(1u << Comptador);
     *TimerHandle = Comptador;
     return (TI_CERT);
 }
 
 void TI_ResetTics (unsigned char TimerHandle) {
     di();
-    Timers[TimerHandle].TicsInicials = Tics;
+    TimerStarts[TimerHandle] = Tics;
     ei();
 }
 
@@ -59,9 +58,9 @@ unsigned long TI_GetTics (unsigned char TimerHandle) {
     di();
     unsigned long CopiaTicsActual = Tics;
     ei();
-    return (CopiaTicsActual - (Timers[TimerHandle].TicsInicials));
+    return (CopiaTicsActual - TimerStarts[TimerHandle]);
 }
 
 void TI_CloseTimer (unsigned char TimerHandle) {
-    Timers[TimerHandle].Busy = TI_FALS;
+    TimerBusyMask &= (unsigned char)(~(1u << TimerHandle));
 }

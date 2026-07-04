@@ -8,6 +8,7 @@
 #define DISPLAY_MESSAGE_TIME 3000UL
 
 static unsigned char timerHandle;
+static char displayLine[17];
 
 static void Display_PutFixedLine (unsigned char row, const char *text) {
     unsigned char i = 0;
@@ -51,7 +52,6 @@ static void Display_AppendNumber (char *line, unsigned char *index, unsigned cha
 }
 
 static void Display_ShowNotification (const FarmNotification *notification) {
-    char line2[17];
     unsigned char index = 0;
     const char *name;
 
@@ -80,31 +80,30 @@ static void Display_ShowNotification (const FarmNotification *notification) {
     }
 
     while (*name != '\0' && index < 16) {
-        line2[index] = *name;
+        displayLine[index] = *name;
         index++;
         name++;
     }
     if (index < 16) {
-        line2[index] = ':';
+        displayLine[index] = ':';
         index++;
     }
     if (index < 16) {
-        line2[index] = ' ';
+        displayLine[index] = ' ';
         index++;
     }
     if (index < 16) {
-        Display_AppendNumber(line2, &index, notification->number);
+        Display_AppendNumber(displayLine, &index, notification->number);
     }
     while (index < 16) {
-        line2[index] = ' ';
+        displayLine[index] = ' ';
         index++;
     }
-    line2[16] = '\0';
-    Display_PutFixedLine(1, line2);
+    displayLine[16] = '\0';
+    Display_PutFixedLine(1, displayLine);
 }
 
 static void Display_ShowIdleScreen (void) {
-    char line2[17];
     unsigned char index;
 
     if (Farm_IsConfigured() == 0 && SerialTime_IsConfigured() == 0) {
@@ -122,23 +121,23 @@ static void Display_ShowIdleScreen (void) {
         return;
     }
 
-    line2[0] = 'F';
-    line2[1] = 'e';
-    line2[2] = 'c';
-    line2[3] = 'h';
-    line2[4] = 'a';
-    line2[5] = ' ';
-    line2[6] = (char)('0' + (SerialTime_GetDay() / 10));
-    line2[7] = (char)('0' + (SerialTime_GetDay() % 10));
-    line2[8] = '/';
-    line2[9] = (char)('0' + (SerialTime_GetMonth() / 10));
-    line2[10] = (char)('0' + (SerialTime_GetMonth() % 10));
+    displayLine[0] = 'F';
+    displayLine[1] = 'e';
+    displayLine[2] = 'c';
+    displayLine[3] = 'h';
+    displayLine[4] = 'a';
+    displayLine[5] = ' ';
+    displayLine[6] = (char)('0' + (SerialTime_GetDay() / 10));
+    displayLine[7] = (char)('0' + (SerialTime_GetDay() % 10));
+    displayLine[8] = '/';
+    displayLine[9] = (char)('0' + (SerialTime_GetMonth() / 10));
+    displayLine[10] = (char)('0' + (SerialTime_GetMonth() % 10));
     for (index = 11; index < 16; index++) {
-        line2[index] = ' ';
+        displayLine[index] = ' ';
     }
-    line2[16] = '\0';
+    displayLine[16] = '\0';
 
-    Display_ShowText(Farm_GetName(), line2);
+    Display_ShowText(Farm_GetName(), displayLine);
 }
 
 void Display_Init (void) {

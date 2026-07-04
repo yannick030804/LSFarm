@@ -2,7 +2,7 @@
 #include "TAD_SERIAL_JAVA.h"
 
 static unsigned char stringIndex;
-static char line[32];
+static char line[24];
 static unsigned char lineIndex;
 
 void SerialJava_Init (void) {
