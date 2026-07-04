@@ -23,20 +23,7 @@ static volatile unsigned char txNext;
 static volatile unsigned char txEcho;
 static const char *txPtr;
 
-static char rxChar0;
-static char rxChar1;
-static char rxChar2;
-static char rxChar3;
-static char rxChar4;
-static char rxChar5;
-static char rxChar6;
-static char rxChar7;
-static char rxChar8;
-static char rxChar9;
-static char rxChar10;
-static char rxChar11;
-static char rxChar12;
-static char rxChar13;
+static char rxChars[SERIAL_TIME_LINE_MAX];
 static unsigned char rxLen;
 static STDate currentDate;
 static unsigned char tempDay;
@@ -44,44 +31,6 @@ static unsigned char tempMonth;
 static unsigned char tempHour;
 static unsigned char tempMinute;
 static unsigned char tempSecond;
-
-static void setRxChar (unsigned char index, char c) {
-    switch (index) {
-        case 0: rxChar0 = c; break;
-        case 1: rxChar1 = c; break;
-        case 2: rxChar2 = c; break;
-        case 3: rxChar3 = c; break;
-        case 4: rxChar4 = c; break;
-        case 5: rxChar5 = c; break;
-        case 6: rxChar6 = c; break;
-        case 7: rxChar7 = c; break;
-        case 8: rxChar8 = c; break;
-        case 9: rxChar9 = c; break;
-        case 10: rxChar10 = c; break;
-        case 11: rxChar11 = c; break;
-        case 12: rxChar12 = c; break;
-        case 13: rxChar13 = c; break;
-    }
-}
-
-static char getRxChar (unsigned char index) {
-    switch (index) {
-        case 0: return rxChar0;
-        case 1: return rxChar1;
-        case 2: return rxChar2;
-        case 3: return rxChar3;
-        case 4: return rxChar4;
-        case 5: return rxChar5;
-        case 6: return rxChar6;
-        case 7: return rxChar7;
-        case 8: return rxChar8;
-        case 9: return rxChar9;
-        case 10: return rxChar10;
-        case 11: return rxChar11;
-        case 12: return rxChar12;
-        default: return rxChar13;
-    }
-}
 
 static unsigned char isDigit (char c) {
     if (c >= '0' && c <= '9') {
@@ -91,7 +40,7 @@ static unsigned char isDigit (char c) {
 }
 
 static unsigned char parseTwoDigits (unsigned char index) {
-    return (unsigned char)((getRxChar(index) - '0') * 10 + (getRxChar(index + 1) - '0'));
+    return (unsigned char)((rxChars[index] - '0') * 10 + (rxChars[index + 1] - '0'));
 }
 
 static unsigned char getRxBitIdx (void) {
@@ -207,7 +156,7 @@ void motorSerialTime (void) {
                     }
                 } else if (rxLen < SERIAL_TIME_LINE_MAX) {
                     txEcho = c;
-                    setRxChar(rxLen, (char)c);
+                    rxChars[rxLen] = (char)c;
                     rxLen++;
                 } else {
                     rxLen = 0;
@@ -229,7 +178,7 @@ void motorSerialTime (void) {
             }
             break;
         case 2:
-            if (isDigit(getRxChar(0)) && isDigit(getRxChar(1))) {
+            if (isDigit(rxChars[0]) && isDigit(rxChars[1])) {
                 tempDay = parseTwoDigits(0);
                 state = 3;
             } else {
@@ -239,7 +188,7 @@ void motorSerialTime (void) {
             }
             break;
         case 3:
-            if (getRxChar(2) == '/') {
+            if (rxChars[2] == '/') {
                 state = 4;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -248,7 +197,7 @@ void motorSerialTime (void) {
             }
             break;
         case 4:
-            if (isDigit(getRxChar(3)) && isDigit(getRxChar(4))) {
+            if (isDigit(rxChars[3]) && isDigit(rxChars[4])) {
                 tempMonth = parseTwoDigits(3);
                 state = 5;
             } else {
@@ -258,7 +207,7 @@ void motorSerialTime (void) {
             }
             break;
         case 5:
-            if (getRxChar(5) == ' ') {
+            if (rxChars[5] == ' ') {
                 state = 6;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -267,7 +216,7 @@ void motorSerialTime (void) {
             }
             break;
         case 6:
-            if (isDigit(getRxChar(6)) && isDigit(getRxChar(7))) {
+            if (isDigit(rxChars[6]) && isDigit(rxChars[7])) {
                 tempHour = parseTwoDigits(6);
                 state = 7;
             } else {
@@ -277,7 +226,7 @@ void motorSerialTime (void) {
             }
             break;
         case 7:
-            if (getRxChar(8) == ':') {
+            if (rxChars[8] == ':') {
                 state = 8;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -286,7 +235,7 @@ void motorSerialTime (void) {
             }
             break;
         case 8:
-            if (isDigit(getRxChar(9)) && isDigit(getRxChar(10))) {
+            if (isDigit(rxChars[9]) && isDigit(rxChars[10])) {
                 tempMinute = parseTwoDigits(9);
                 state = 9;
             } else {
@@ -296,7 +245,7 @@ void motorSerialTime (void) {
             }
             break;
         case 9:
-            if (getRxChar(11) == ':') {
+            if (rxChars[11] == ':') {
                 state = 10;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -305,7 +254,7 @@ void motorSerialTime (void) {
             }
             break;
         case 10:
-            if (isDigit(getRxChar(12)) && isDigit(getRxChar(13))) {
+            if (isDigit(rxChars[12]) && isDigit(rxChars[13])) {
                 tempSecond = parseTwoDigits(12);
                 state = 11;
             } else {

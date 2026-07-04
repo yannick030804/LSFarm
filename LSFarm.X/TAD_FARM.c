@@ -31,28 +31,13 @@ static unsigned char currentSecond;
 
 static char farmName[FARM_MAX_NAME + 1];
 static const char *pendingName;
-static unsigned char pendingTimeCow;
-static unsigned char pendingTimePig;
-static unsigned char pendingTimeHorse;
-static unsigned char pendingTimeChicken;
+static unsigned char pendingTimes[FARM_NUM_SPECIES];
 static unsigned char configRequested;
 
-static unsigned char generationTimeCow;
-static unsigned char generationTimePig;
-static unsigned char generationTimeHorse;
-static unsigned char generationTimeChicken;
-static unsigned char animalCountCow;
-static unsigned char animalCountPig;
-static unsigned char animalCountHorse;
-static unsigned char animalCountChicken;
-static unsigned char criticalCountCow;
-static unsigned char criticalCountPig;
-static unsigned char criticalCountHorse;
-static unsigned char criticalCountChicken;
-static unsigned char productCountCow;
-static unsigned char productCountPig;
-static unsigned char productCountHorse;
-static unsigned char productCountChicken;
+static unsigned char generationTimes[FARM_NUM_SPECIES];
+static unsigned char animalCounts[FARM_NUM_SPECIES];
+static unsigned char criticalCounts[FARM_NUM_SPECIES];
+static unsigned char productCounts[FARM_NUM_SPECIES];
 
 static unsigned char totalAnimals;
 
@@ -66,26 +51,13 @@ static unsigned char restRequestPending;
 static unsigned char restFinished;
 static unsigned char restSuccess;
 
-static unsigned char lastGenerationCow;
-static unsigned char lastGenerationPig;
-static unsigned char lastGenerationHorse;
-static unsigned char lastGenerationChicken;
-static unsigned char lastProductCow;
-static unsigned char lastProductPig;
-static unsigned char lastProductHorse;
-static unsigned char lastProductChicken;
+static unsigned char lastGeneration[FARM_NUM_SPECIES];
+static unsigned char lastProduct[FARM_NUM_SPECIES];
 
 static unsigned char animalInfo[FARM_MAX_ANIMALS];
 static unsigned long animalSleepStamp[FARM_MAX_ANIMALS];
 static unsigned char notificationMeta[FARM_NOTIFICATION_QUEUE_SIZE];
-static unsigned char notificationValue0;
-static unsigned char notificationValue1;
-static unsigned char notificationValue2;
-static unsigned char notificationValue3;
-static unsigned char notificationValue4;
-static unsigned char notificationValue5;
-static unsigned char notificationValue6;
-static unsigned char notificationValue7;
+static unsigned char notificationValues[FARM_NOTIFICATION_QUEUE_SIZE];
 static unsigned char notificationHead;
 static unsigned char notificationCount;
 
@@ -126,6 +98,7 @@ static void Farm_SetLastGenerationBySpecies (unsigned char species, unsigned cha
 static unsigned char Farm_GetLastProductBySpecies (unsigned char species);
 static void Farm_SetLastProductBySpecies (unsigned char species, unsigned char value);
 static unsigned char Farm_GetProductTimeBySpecies (unsigned char species);
+static const unsigned char productTimes[FARM_NUM_SPECIES] = {47, 31, 23, 13};
 
 void Farm_Init (void) {
     TI_NewTimer(&timerHandle);
@@ -826,162 +799,69 @@ static void Farm_SetAnimalCritical (unsigned char index, unsigned char critical)
 }
 
 static unsigned char Farm_GetPendingTime (unsigned char species) {
-    switch (species) {
-        case SPECIES_COW: return pendingTimeCow;
-        case SPECIES_PIG: return pendingTimePig;
-        case SPECIES_HORSE: return pendingTimeHorse;
-        default: return pendingTimeChicken;
-    }
+    return pendingTimes[species];
 }
 
 static void Farm_SetPendingTime (unsigned char species, unsigned char value) {
-    switch (species) {
-        case SPECIES_COW: pendingTimeCow = value; break;
-        case SPECIES_PIG: pendingTimePig = value; break;
-        case SPECIES_HORSE: pendingTimeHorse = value; break;
-        default: pendingTimeChicken = value; break;
-    }
+    pendingTimes[species] = value;
 }
 
 static unsigned char Farm_GetGenerationTimeBySpecies (unsigned char species) {
-    switch (species) {
-        case SPECIES_COW: return generationTimeCow;
-        case SPECIES_PIG: return generationTimePig;
-        case SPECIES_HORSE: return generationTimeHorse;
-        default: return generationTimeChicken;
-    }
+    return generationTimes[species];
 }
 
 static void Farm_SetGenerationTimeBySpecies (unsigned char species, unsigned char value) {
-    switch (species) {
-        case SPECIES_COW: generationTimeCow = value; break;
-        case SPECIES_PIG: generationTimePig = value; break;
-        case SPECIES_HORSE: generationTimeHorse = value; break;
-        default: generationTimeChicken = value; break;
-    }
+    generationTimes[species] = value;
 }
 
 static unsigned char Farm_GetAnimalCountBySpecies (unsigned char species) {
-    switch (species) {
-        case SPECIES_COW: return animalCountCow;
-        case SPECIES_PIG: return animalCountPig;
-        case SPECIES_HORSE: return animalCountHorse;
-        default: return animalCountChicken;
-    }
+    return animalCounts[species];
 }
 
 static void Farm_SetAnimalCountBySpecies (unsigned char species, unsigned char value) {
-    switch (species) {
-        case SPECIES_COW: animalCountCow = value; break;
-        case SPECIES_PIG: animalCountPig = value; break;
-        case SPECIES_HORSE: animalCountHorse = value; break;
-        default: animalCountChicken = value; break;
-    }
+    animalCounts[species] = value;
 }
 
 static unsigned char Farm_GetCriticalCountBySpecies (unsigned char species) {
-    switch (species) {
-        case SPECIES_COW: return criticalCountCow;
-        case SPECIES_PIG: return criticalCountPig;
-        case SPECIES_HORSE: return criticalCountHorse;
-        default: return criticalCountChicken;
-    }
+    return criticalCounts[species];
 }
 
 static void Farm_SetCriticalCountBySpecies (unsigned char species, unsigned char value) {
-    switch (species) {
-        case SPECIES_COW: criticalCountCow = value; break;
-        case SPECIES_PIG: criticalCountPig = value; break;
-        case SPECIES_HORSE: criticalCountHorse = value; break;
-        default: criticalCountChicken = value; break;
-    }
+    criticalCounts[species] = value;
 }
 
 static unsigned char Farm_GetProductCountBySpecies (unsigned char species) {
-    switch (species) {
-        case SPECIES_COW: return productCountCow;
-        case SPECIES_PIG: return productCountPig;
-        case SPECIES_HORSE: return productCountHorse;
-        default: return productCountChicken;
-    }
+    return productCounts[species];
 }
 
 static void Farm_SetProductCountBySpecies (unsigned char species, unsigned char value) {
-    switch (species) {
-        case SPECIES_COW: productCountCow = value; break;
-        case SPECIES_PIG: productCountPig = value; break;
-        case SPECIES_HORSE: productCountHorse = value; break;
-        default: productCountChicken = value; break;
-    }
+    productCounts[species] = value;
 }
 
 static unsigned char Farm_GetLastGenerationBySpecies (unsigned char species) {
-    switch (species) {
-        case SPECIES_COW: return lastGenerationCow;
-        case SPECIES_PIG: return lastGenerationPig;
-        case SPECIES_HORSE: return lastGenerationHorse;
-        default: return lastGenerationChicken;
-    }
+    return lastGeneration[species];
 }
 
 static void Farm_SetLastGenerationBySpecies (unsigned char species, unsigned char value) {
-    switch (species) {
-        case SPECIES_COW: lastGenerationCow = value; break;
-        case SPECIES_PIG: lastGenerationPig = value; break;
-        case SPECIES_HORSE: lastGenerationHorse = value; break;
-        default: lastGenerationChicken = value; break;
-    }
+    lastGeneration[species] = value;
 }
 
 static unsigned char Farm_GetLastProductBySpecies (unsigned char species) {
-    switch (species) {
-        case SPECIES_COW: return lastProductCow;
-        case SPECIES_PIG: return lastProductPig;
-        case SPECIES_HORSE: return lastProductHorse;
-        default: return lastProductChicken;
-    }
+    return lastProduct[species];
 }
 
 static void Farm_SetLastProductBySpecies (unsigned char species, unsigned char value) {
-    switch (species) {
-        case SPECIES_COW: lastProductCow = value; break;
-        case SPECIES_PIG: lastProductPig = value; break;
-        case SPECIES_HORSE: lastProductHorse = value; break;
-        default: lastProductChicken = value; break;
-    }
+    lastProduct[species] = value;
 }
 
 static unsigned char Farm_GetProductTimeBySpecies (unsigned char species) {
-    switch (species) {
-        case SPECIES_COW: return 47;
-        case SPECIES_PIG: return 31;
-        case SPECIES_HORSE: return 23;
-        default: return 13;
-    }
+    return productTimes[species];
 }
 
 static void Farm_SetNotificationValue (unsigned char index, unsigned char value) {
-    switch (index) {
-        case 0: notificationValue0 = value; break;
-        case 1: notificationValue1 = value; break;
-        case 2: notificationValue2 = value; break;
-        case 3: notificationValue3 = value; break;
-        case 4: notificationValue4 = value; break;
-        case 5: notificationValue5 = value; break;
-        case 6: notificationValue6 = value; break;
-        default: notificationValue7 = value; break;
-    }
+    notificationValues[index] = value;
 }
 
 static unsigned char Farm_GetNotificationValue (unsigned char index) {
-    switch (index) {
-        case 0: return notificationValue0;
-        case 1: return notificationValue1;
-        case 2: return notificationValue2;
-        case 3: return notificationValue3;
-        case 4: return notificationValue4;
-        case 5: return notificationValue5;
-        case 6: return notificationValue6;
-        default: return notificationValue7;
-    }
+    return notificationValues[index];
 }
