@@ -3,12 +3,8 @@
 
 static unsigned char mode;
 static unsigned char clearIndex;
-static unsigned char byteAddr;
-static unsigned char byteData;
 
-static void launchWrite (unsigned char addr, unsigned char data) {
-    EEADR = addr;
-    EEDATA = data;
+static void launchWrite (void) {
     EECON1bits.EEPGD = 0;
     EECON1bits.CFGS = 0;
     EECON1bits.WREN = 1;
@@ -23,8 +19,6 @@ static void launchWrite (unsigned char addr, unsigned char data) {
 void EEPROM_Init (void) {
     mode = 0;
     clearIndex = 0;
-    byteAddr = 0;
-    byteData = 0;
 }
 
 void motorEEPROM (void) {
@@ -37,13 +31,15 @@ void motorEEPROM (void) {
     }
 
     if (mode == 2) {
-        launchWrite(clearIndex, 0);
+        EEADR = clearIndex;
+        EEDATA = 0;
+        launchWrite();
         clearIndex++;
         if (clearIndex == 0) {
             mode = 3;
         }
     } else if (mode == 1) {
-        launchWrite(byteAddr, byteData);
+        launchWrite();
         mode = 3;
     } else {
         EECON1bits.WREN = 0;
@@ -64,8 +60,8 @@ unsigned char EEPROM_StartByteWrite (unsigned char addr, unsigned char data) {
         return 0;
     }
 
-    byteAddr = addr;
-    byteData = data;
+    EEADR = addr;
+    EEDATA = data;
     mode = 1;
     return 1;
 }
