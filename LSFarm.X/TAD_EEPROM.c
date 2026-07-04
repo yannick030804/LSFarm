@@ -28,41 +28,28 @@ void EEPROM_Init (void) {
 }
 
 void motorEEPROM (void) {
-    static unsigned char state = 0;
+    if (mode == 0) {
+        return;
+    }
 
-    switch (state) {
-        case 0:
-            if (mode != 0) {
-                state = 1;
-            }
-            break;
-        case 1:
-            if (EECON1bits.WR == 1) {
-                break;
-            }
+    if (EECON1bits.WR == 1) {
+        return;
+    }
 
-            if (mode == 2) {
-                if (clearIndex >= 256U) {
-                    EECON1bits.WREN = 0;
-                    mode = 0;
-                    state = 0;
-                } else {
-                    launchWrite((unsigned char)clearIndex, 0);
-                    clearIndex++;
-                }
-            } else if (mode == 1) {
-                launchWrite(byteAddr, byteData);
-                mode = 4;
-            } else if (mode == 4) {
-                EECON1bits.WREN = 0;
-                mode = 0;
-                state = 0;
-            } else {
-                EECON1bits.WREN = 0;
-                mode = 0;
-                state = 0;
-            }
-            break;
+    if (mode == 2) {
+        if (clearIndex >= 256U) {
+            EECON1bits.WREN = 0;
+            mode = 0;
+        } else {
+            launchWrite((unsigned char)clearIndex, 0);
+            clearIndex++;
+        }
+    } else if (mode == 1) {
+        launchWrite(byteAddr, byteData);
+        mode = 4;
+    } else {
+        EECON1bits.WREN = 0;
+        mode = 0;
     }
 }
 
