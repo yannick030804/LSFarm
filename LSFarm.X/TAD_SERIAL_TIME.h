@@ -16,7 +16,6 @@ void motorSerialTime (void);
 void SerialTime_StartBitISR (void);
 void SerialTime_TickISR (void);
 unsigned char SerialTime_IsConfigured (void);
-const STDate *SerialTime_GetDate (void);
 unsigned char SerialTime_GetDay (void);
 unsigned char SerialTime_GetMonth (void);
 unsigned char SerialTime_GetHour (void);

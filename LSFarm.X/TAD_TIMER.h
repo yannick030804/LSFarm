@@ -14,6 +14,4 @@ void TI_ResetTics (unsigned char TimerHandle);
 
 unsigned long TI_GetTics (unsigned char TimerHandle);
 
-void TI_CloseTimer (unsigned char TimerHandle);
-
 #endif

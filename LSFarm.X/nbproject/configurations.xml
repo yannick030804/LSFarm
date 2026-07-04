@@ -30,6 +30,7 @@
       <itemPath>TAD_SERIAL_JAVA.c</itemPath>
       <itemPath>TAD_LDR.c</itemPath>
       <itemPath>TAD_LCD.c</itemPath>
+      <itemPath>TAD_DISPLAY.c</itemPath>
       <itemPath>TAD_JOYSTICK.c</itemPath>
       <itemPath>TAD_HEARTBEAT.c</itemPath>
       <itemPath>TAD_FARM.c</itemPath>

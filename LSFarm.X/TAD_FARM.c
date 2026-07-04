@@ -291,10 +291,6 @@ unsigned char Farm_IsAnimalFound (void) {
     return searchFound;
 }
 
-signed char Farm_GetSelectedAnimalIndex (void) {
-    return selectedAnimalIndex;
-}
-
 unsigned char Farm_IsRestRequestPending (void) {
     return restRequestPending;
 }
@@ -353,58 +349,6 @@ unsigned char Farm_IsConfigured (void) {
 
 const char *Farm_GetName (void) {
     return farmName;
-}
-
-unsigned char Farm_GetCow (void) {
-    return Farm_GetGenerationTimeBySpecies(SPECIES_COW);
-}
-
-unsigned char Farm_GetPig (void) {
-    return Farm_GetGenerationTimeBySpecies(SPECIES_PIG);
-}
-
-unsigned char Farm_GetHorse (void) {
-    return Farm_GetGenerationTimeBySpecies(SPECIES_HORSE);
-}
-
-unsigned char Farm_GetChicken (void) {
-    return Farm_GetGenerationTimeBySpecies(SPECIES_CHICKEN);
-}
-
-unsigned char Farm_GetNumCow (void) {
-    return Farm_GetAnimalCountBySpecies(SPECIES_COW);
-}
-
-unsigned char Farm_GetNumPig (void) {
-    return Farm_GetAnimalCountBySpecies(SPECIES_PIG);
-}
-
-unsigned char Farm_GetNumHorse (void) {
-    return Farm_GetAnimalCountBySpecies(SPECIES_HORSE);
-}
-
-unsigned char Farm_GetNumChicken (void) {
-    return Farm_GetAnimalCountBySpecies(SPECIES_CHICKEN);
-}
-
-unsigned char Farm_GetMilk (void) {
-    return Farm_GetProductCountBySpecies(SPECIES_COW);
-}
-
-unsigned char Farm_GetHam (void) {
-    return Farm_GetProductCountBySpecies(SPECIES_PIG);
-}
-
-unsigned char Farm_GetBrush (void) {
-    return Farm_GetProductCountBySpecies(SPECIES_HORSE);
-}
-
-unsigned char Farm_GetEggs (void) {
-    return Farm_GetProductCountBySpecies(SPECIES_CHICKEN);
-}
-
-unsigned char Farm_GetTotalAnimals (void) {
-    return totalAnimals;
 }
 
 unsigned char Farm_GetAnimalCount (void) {
@@ -593,22 +537,6 @@ void Farm_EndImportState (void) {
     Farm_RecountAnimals();
     configured = 1;
     dirtyState = 0;
-}
-
-void Farm_ExportState (unsigned char *buffer) {
-    unsigned char i;
-    for (i = 0; i < FARM_STATE_SIZE; i++) {
-        buffer[i] = Farm_ExportByte(i);
-    }
-}
-
-void Farm_ImportState (const unsigned char *buffer) {
-    unsigned char i;
-    Farm_BeginImportState();
-    for (i = 0; i < FARM_STATE_SIZE; i++) {
-        Farm_ImportStateByte(i, buffer[i]);
-    }
-    Farm_EndImportState();
 }
 
 unsigned char Farm_IsDirty (void) {

@@ -121,14 +121,6 @@ void LCD_PutChar(char c)
     }
 }
 
-void LCD_PutString(const char *s)
-{
-    while (*s != '\0') {
-        LCD_PutChar(*s);
-        s++;
-    }
-}
-
 void motorLCD (void) {
     static unsigned char state = 0;
 

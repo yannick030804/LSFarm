@@ -60,7 +60,3 @@ unsigned long TI_GetTics (unsigned char TimerHandle) {
     ei();
     return (CopiaTicsActual - TimerStarts[TimerHandle]);
 }
-
-void TI_CloseTimer (unsigned char TimerHandle) {
-    TimerBusyMask &= (unsigned char)(~(1u << TimerHandle));
-}

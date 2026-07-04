@@ -409,13 +409,6 @@ unsigned char SerialTime_IsConfigured (void) {
     return 0;
 }
 
-const STDate *SerialTime_GetDate (void) {
-    if ((stFlags & ST_FLAG_TIME_CONFIGURED) == 0) {
-        return 0;
-    }
-    return &currentDate;
-}
-
 unsigned char SerialTime_GetDay (void) {
     return currentDate.day;
 }
