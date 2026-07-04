@@ -6,10 +6,6 @@ static unsigned char mode;
 static unsigned int clearIndex;
 static unsigned char byteAddr;
 static unsigned char byteData;
-static unsigned char imageAddr;
-static unsigned char imageLen;
-static unsigned char imageIndex;
-static const unsigned char *imageSrc;
 
 static void launchWrite (unsigned char addr, unsigned char data) {
     EEADR = addr;
@@ -31,10 +27,6 @@ void EEPROM_Init (void) {
     clearIndex = 0;
     byteAddr = 0;
     byteData = 0;
-    imageAddr = 0;
-    imageLen = 0;
-    imageIndex = 0;
-    imageSrc = 0;
 }
 
 void motorEEPROM (void) {
@@ -69,16 +61,6 @@ void motorEEPROM (void) {
                 busy = 0;
                 mode = 0;
                 state = 0;
-            } else if (mode == 3) {
-                if (imageIndex >= imageLen) {
-                    EECON1bits.WREN = 0;
-                    busy = 0;
-                    mode = 0;
-                    state = 0;
-                } else {
-                    launchWrite((unsigned char)(imageAddr + imageIndex), imageSrc[imageIndex]);
-                    imageIndex++;
-                }
             } else {
                 EECON1bits.WREN = 0;
                 busy = 0;
@@ -94,28 +76,6 @@ unsigned char EEPROM_ReadByte (unsigned char addr) {
     EECON1bits.CFGS = 0;
     EECON1bits.RD = 1;
     return EEDATA;
-}
-
-void EEPROM_ReadBlock (unsigned char addr, unsigned char *dst, unsigned char len) {
-    unsigned char i;
-
-    for (i = 0; i < len; i++) {
-        dst[i] = EEPROM_ReadByte((unsigned char)(addr + i));
-    }
-}
-
-unsigned char EEPROM_StartImageWrite (unsigned char addr, const unsigned char *src, unsigned char len) {
-    if (busy == 1) {
-        return 0;
-    }
-
-    imageAddr = addr;
-    imageLen = len;
-    imageIndex = 0;
-    imageSrc = src;
-    mode = 3;
-    busy = 1;
-    return 1;
 }
 
 unsigned char EEPROM_StartByteWrite (unsigned char addr, unsigned char data) {
