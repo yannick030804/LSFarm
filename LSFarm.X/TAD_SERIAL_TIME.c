@@ -22,7 +22,7 @@ static volatile unsigned char txNext;
 static volatile unsigned char txEcho;
 static const char *txPtr;
 
-static char rxLine[SERIAL_TIME_LINE_MAX + 1];
+static char rxLine[SERIAL_TIME_LINE_MAX];
 static unsigned char rxLen;
 static unsigned char timeConfigured;
 static STDate currentDate;
@@ -134,7 +134,6 @@ void motorSerialTime (void) {
 
                 if (c == '\r' || c == '\n') {
                     if (rxLen > 0) {
-                        rxLine[rxLen] = '\0';
                         state = 1;
                     }
                 } else if (rxLen < SERIAL_TIME_LINE_MAX) {
