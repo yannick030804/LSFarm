@@ -487,102 +487,128 @@ void Farm_SetCurrentDate (unsigned char valid, unsigned char day, unsigned char 
     }
 }
 
-void Farm_ExportState (unsigned char *buffer) {
-    unsigned char i;
-    unsigned char index = 0;
+unsigned char Farm_ExportByte (unsigned char index) {
+    unsigned char animalIndex;
+    unsigned char byteIndex;
 
-    for (i = 0; i < sizeof(farmName); i++) {
-        buffer[index] = (unsigned char)farmName[i];
-        index++;
+    if (index < (FARM_MAX_NAME + 1)) {
+        return (unsigned char)farmName[index];
     }
 
-    for (i = 0; i < FARM_NUM_SPECIES; i++) {
-        buffer[index] = Farm_GetGenerationTimeBySpecies(i);
-        index++;
+    index = (unsigned char)(index - (FARM_MAX_NAME + 1));
+    if (index < FARM_NUM_SPECIES) {
+        return Farm_GetGenerationTimeBySpecies(index);
     }
 
-    buffer[index] = totalAnimals;
-    index++;
-    for (i = 0; i < FARM_NUM_SPECIES; i++) {
-        buffer[index] = Farm_GetProductCountBySpecies(i);
-        index++;
+    index = (unsigned char)(index - FARM_NUM_SPECIES);
+    if (index == 0) {
+        return totalAnimals;
     }
 
-    for (i = 0; i < FARM_MAX_ANIMALS; i++) {
-        if (i < totalAnimals) {
-            buffer[index] = animalInfo[i];
-            index++;
-            buffer[index] = (unsigned char)(animalSleepStamp[i] & 0xFFUL);
-            index++;
-            buffer[index] = (unsigned char)((animalSleepStamp[i] >> 8) & 0xFFUL);
-            index++;
-            buffer[index] = (unsigned char)((animalSleepStamp[i] >> 16) & 0xFFUL);
-            index++;
-            buffer[index] = (unsigned char)((animalSleepStamp[i] >> 24) & 0xFFUL);
-            index++;
-        } else {
-            buffer[index] = 0;
-            index++;
-            buffer[index] = 0;
-            index++;
-            buffer[index] = 0;
-            index++;
-            buffer[index] = 0;
-            index++;
-            buffer[index] = 0;
-            index++;
-        }
+    index--;
+    if (index < FARM_NUM_SPECIES) {
+        return Farm_GetProductCountBySpecies(index);
     }
+
+    index = (unsigned char)(index - FARM_NUM_SPECIES);
+    animalIndex = (unsigned char)(index / 5);
+    byteIndex = (unsigned char)(index % 5);
+
+    if (animalIndex >= FARM_MAX_ANIMALS || animalIndex >= totalAnimals) {
+        return 0;
+    }
+
+    if (byteIndex == 0) {
+        return animalInfo[animalIndex];
+    }
+
+    return (unsigned char)((animalSleepStamp[animalIndex] >> ((unsigned long)(byteIndex - 1) * 8UL)) & 0xFFUL);
 }
 
-void Farm_ImportState (const unsigned char *buffer) {
-    unsigned char i;
-    unsigned char index = 0;
-
+void Farm_BeginImportState (void) {
     Farm_ClearCurrentData();
+}
 
-    for (i = 0; i < sizeof(farmName); i++) {
-        farmName[i] = (char)buffer[index];
-        index++;
+void Farm_ImportStateByte (unsigned char index, unsigned char value) {
+    unsigned char animalIndex;
+    unsigned char byteIndex;
+    unsigned long mask;
+
+    if (index < (FARM_MAX_NAME + 1)) {
+        farmName[index] = (char)value;
+        return;
     }
-    farmName[FARM_MAX_NAME] = '\0';
 
-    for (i = 0; i < FARM_NUM_SPECIES; i++) {
-        Farm_SetGenerationTimeBySpecies(i, buffer[index]);
-        index++;
+    index = (unsigned char)(index - (FARM_MAX_NAME + 1));
+    if (index < FARM_NUM_SPECIES) {
+        Farm_SetGenerationTimeBySpecies(index, value);
+        return;
     }
 
-    totalAnimals = buffer[index];
-    index++;
+    index = (unsigned char)(index - FARM_NUM_SPECIES);
+    if (index == 0) {
+        totalAnimals = value;
+        return;
+    }
+
+    index--;
+    if (index < FARM_NUM_SPECIES) {
+        Farm_SetProductCountBySpecies(index, value);
+        return;
+    }
+
+    index = (unsigned char)(index - FARM_NUM_SPECIES);
+    animalIndex = (unsigned char)(index / 5);
+    byteIndex = (unsigned char)(index % 5);
+
+    if (animalIndex >= FARM_MAX_ANIMALS) {
+        return;
+    }
+
+    if (byteIndex == 0) {
+        animalInfo[animalIndex] = value;
+        return;
+    }
+
+    mask = (unsigned long)0xFF << ((unsigned long)(byteIndex - 1) * 8UL);
+    animalSleepStamp[animalIndex] &= ~mask;
+    animalSleepStamp[animalIndex] |= ((unsigned long)value << ((unsigned long)(byteIndex - 1) * 8UL));
+}
+
+void Farm_EndImportState (void) {
+    unsigned char i;
+
     if (totalAnimals > FARM_MAX_ANIMALS) {
         totalAnimals = FARM_MAX_ANIMALS;
     }
 
-    for (i = 0; i < FARM_NUM_SPECIES; i++) {
-        Farm_SetProductCountBySpecies(i, buffer[index]);
-        index++;
-    }
-
+    farmName[FARM_MAX_NAME] = '\0';
     for (i = 0; i < FARM_MAX_ANIMALS; i++) {
-        animalInfo[i] = buffer[index];
-        index++;
         if (Farm_GetAnimalSpecies(i) >= FARM_NUM_SPECIES) {
             Farm_SetAnimalSpecies(i, SPECIES_COW);
         }
-        animalSleepStamp[i] = (unsigned long)buffer[index];
-        index++;
-        animalSleepStamp[i] |= ((unsigned long)buffer[index] << 8);
-        index++;
-        animalSleepStamp[i] |= ((unsigned long)buffer[index] << 16);
-        index++;
-        animalSleepStamp[i] |= ((unsigned long)buffer[index] << 24);
-        index++;
         Farm_SetAnimalCritical(i, 0);
     }
 
     Farm_RecountAnimals();
     configured = 1;
     dirtyState = 0;
+}
+
+void Farm_ExportState (unsigned char *buffer) {
+    unsigned char i;
+    for (i = 0; i < FARM_STATE_SIZE; i++) {
+        buffer[i] = Farm_ExportByte(i);
+    }
+}
+
+void Farm_ImportState (const unsigned char *buffer) {
+    unsigned char i;
+    Farm_BeginImportState();
+    for (i = 0; i < FARM_STATE_SIZE; i++) {
+        Farm_ImportStateByte(i, buffer[i]);
+    }
+    Farm_EndImportState();
 }
 
 unsigned char Farm_IsDirty (void) {

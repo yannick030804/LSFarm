@@ -29,7 +29,8 @@ static unsigned char recipeId;
 static char txBuffer[21];
 static unsigned char persistenceLoaded;
 static unsigned char resetPersistencePending;
-static unsigned char farmStateBuffer[FARM_STATE_SIZE + 1];
+static unsigned char persistenceSaveActive;
+static unsigned char persistenceIndex;
 
 static void resetInitData (void) {
     farmNameIndex = 0;
@@ -124,9 +125,12 @@ static void Controller_ServiceFarm (void) {
     }
 
     if (persistenceLoaded == 0 && EEPROM_IsBusy() == 0) {
-        EEPROM_ReadBlock(0, farmStateBuffer, sizeof(farmStateBuffer));
-        if (farmStateBuffer[0] == FARM_STATE_MAGIC) {
-            Farm_ImportState(&farmStateBuffer[1]);
+        if (EEPROM_ReadByte(0) == FARM_STATE_MAGIC) {
+            Farm_BeginImportState();
+            for (persistenceIndex = 0; persistenceIndex < FARM_STATE_SIZE; persistenceIndex++) {
+                Farm_ImportStateByte(persistenceIndex, EEPROM_ReadByte((unsigned char)(persistenceIndex + 1)));
+            }
+            Farm_EndImportState();
         }
         persistenceLoaded = 1;
     }
@@ -137,12 +141,25 @@ static void Controller_ServiceFarm (void) {
         return;
     }
 
-    if (Farm_IsDirty() == 1 && EEPROM_IsBusy() == 0 && Farm_IsConfigured() == 1) {
-        farmStateBuffer[0] = FARM_STATE_MAGIC;
-        Farm_ExportState(&farmStateBuffer[1]);
-        if (EEPROM_StartImageWrite(0, farmStateBuffer, sizeof(farmStateBuffer)) == 1) {
+    if (persistenceSaveActive == 1 && EEPROM_IsBusy() == 0) {
+        if (persistenceIndex == 0) {
+            if (EEPROM_StartByteWrite(0, FARM_STATE_MAGIC) == 1) {
+                persistenceIndex = 1;
+            }
+        } else if (persistenceIndex <= FARM_STATE_SIZE) {
+            if (EEPROM_StartByteWrite(persistenceIndex, Farm_ExportByte((unsigned char)(persistenceIndex - 1))) == 1) {
+                persistenceIndex++;
+            }
+        } else {
+            persistenceSaveActive = 0;
             Farm_ClearDirty();
         }
+        return;
+    }
+
+    if (Farm_IsDirty() == 1 && EEPROM_IsBusy() == 0 && Farm_IsConfigured() == 1) {
+        persistenceSaveActive = 1;
+        persistenceIndex = 0;
     }
 }
 
@@ -225,6 +242,8 @@ void Controller_Init (void) {
     resetInitData();
     persistenceLoaded = 0;
     resetPersistencePending = 0;
+    persistenceSaveActive = 0;
+    persistenceIndex = 0;
 }
 
 void motorController (void) {

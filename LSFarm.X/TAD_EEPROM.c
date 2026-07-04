@@ -4,6 +4,8 @@
 static unsigned char busy;
 static unsigned char mode;
 static unsigned int clearIndex;
+static unsigned char byteAddr;
+static unsigned char byteData;
 static unsigned char imageAddr;
 static unsigned char imageLen;
 static unsigned char imageIndex;
@@ -27,6 +29,8 @@ void EEPROM_Init (void) {
     busy = 0;
     mode = 0;
     clearIndex = 0;
+    byteAddr = 0;
+    byteData = 0;
     imageAddr = 0;
     imageLen = 0;
     imageIndex = 0;
@@ -57,6 +61,14 @@ void motorEEPROM (void) {
                     launchWrite((unsigned char)clearIndex, 0);
                     clearIndex++;
                 }
+            } else if (mode == 1) {
+                launchWrite(byteAddr, byteData);
+                mode = 4;
+            } else if (mode == 4) {
+                EECON1bits.WREN = 0;
+                busy = 0;
+                mode = 0;
+                state = 0;
             } else if (mode == 3) {
                 if (imageIndex >= imageLen) {
                     EECON1bits.WREN = 0;
@@ -102,6 +114,18 @@ unsigned char EEPROM_StartImageWrite (unsigned char addr, const unsigned char *s
     imageIndex = 0;
     imageSrc = src;
     mode = 3;
+    busy = 1;
+    return 1;
+}
+
+unsigned char EEPROM_StartByteWrite (unsigned char addr, unsigned char data) {
+    if (busy == 1) {
+        return 0;
+    }
+
+    byteAddr = addr;
+    byteData = data;
+    mode = 1;
     busy = 1;
     return 1;
 }
