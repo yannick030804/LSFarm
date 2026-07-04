@@ -22,25 +22,18 @@ static void CantaPartBaixa(char c)
     LATD = (LATD & 0xC3) | ((c << 2) & 0x3C);
 }
 
-static void CantaIR(char ir)
+static void LCD_SendByte(char value, unsigned char isData)
 {
-    RSDown();
+    if (isData == 1) {
+        RSUp();
+    } else {
+        RSDown();
+    }
     EnableUp();
-    CantaPartAlta(ir);
+    CantaPartAlta(value);
     EnableDown();
     EnableUp();
-    CantaPartBaixa(ir);
-    EnableDown();
-}
-
-static void CantaData(char data)
-{
-    RSUp();
-    EnableUp();
-    CantaPartAlta(data);
-    EnableDown();
-    EnableUp();
-    CantaPartBaixa(data);
+    CantaPartBaixa(value);
     EnableDown();
 }
 
@@ -83,42 +76,26 @@ void LCD_Init(void) {
     EsperaMs(5);
     EscriuPrimeraOrdre(0x02);
     EsperaMs(1);
-    CantaIR(0x28);
+    LCD_SendByte(0x28, 0);
     EsperaMs(2);
-    CantaIR(0x08);
+    LCD_SendByte(0x08, 0);
     EsperaMs(2);
-    CantaIR(0x01);
+    LCD_SendByte(0x01, 0);
     EsperaMs(3);
-    CantaIR(0x06);
+    LCD_SendByte(0x06, 0);
     EsperaMs(2);
-    CantaIR(0x0C);
-}
-
-void LCD_Clear(void)
-{
-    unsigned char i;
-
-    for (i = 0; i < 32; i++) {
-        frame[i] = ' ';
-    }
-    cursor = 0;
+    LCD_SendByte(0x0C, 0);
 }
 
 void LCD_GotoXY(unsigned char column, unsigned char row)
 {
     cursor = (unsigned char)(column + (row ? 16 : 0));
-    if (cursor >= 32) {
-        cursor = 0;
-    }
 }
 
 void LCD_PutChar(char c)
 {
     frame[cursor] = c;
     cursor++;
-    if (cursor >= 32) {
-        cursor = 0;
-    }
 }
 
 void motorLCD (void) {
@@ -131,23 +108,23 @@ void motorLCD (void) {
 
     switch (state) {
         case 0:
-            CantaIR(0x80);
+            LCD_SendByte(0x80, 0);
             scan = 0;
             state = 1;
             break;
         case 1:
-            CantaData(frame[scan]);
+            LCD_SendByte(frame[scan], 1);
             scan++;
             if (scan >= 16) {
                 state = 2;
             }
             break;
         case 2:
-            CantaIR(0xC0);
+            LCD_SendByte(0xC0, 0);
             state = 3;
             break;
         case 3:
-            CantaData(frame[scan]);
+            LCD_SendByte(frame[scan], 1);
             scan++;
             if (scan >= 32) {
                 state = 0;
