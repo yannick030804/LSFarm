@@ -2,7 +2,7 @@
 #include "TAD_EEPROM.h"
 
 static unsigned char mode;
-static unsigned int clearIndex;
+static unsigned char clearIndex;
 static unsigned char byteAddr;
 static unsigned char byteData;
 
@@ -37,16 +37,14 @@ void motorEEPROM (void) {
     }
 
     if (mode == 2) {
-        if (clearIndex >= 256U) {
-            EECON1bits.WREN = 0;
-            mode = 0;
-        } else {
-            launchWrite((unsigned char)clearIndex, 0);
-            clearIndex++;
+        launchWrite(clearIndex, 0);
+        clearIndex++;
+        if (clearIndex == 0) {
+            mode = 3;
         }
     } else if (mode == 1) {
         launchWrite(byteAddr, byteData);
-        mode = 4;
+        mode = 3;
     } else {
         EECON1bits.WREN = 0;
         mode = 0;
