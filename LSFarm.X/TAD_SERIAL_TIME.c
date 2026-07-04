@@ -22,10 +22,26 @@ static volatile unsigned char txNext;
 static volatile unsigned char txEcho;
 static const char *txPtr;
 
-static char rxLine[SERIAL_TIME_LINE_MAX];
+static char rxLineA[7];
+static char rxLineB[7];
 static unsigned char rxLen;
 static unsigned char timeConfigured;
 static STDate currentDate;
+
+static void setRxChar (unsigned char index, char c) {
+    if (index < 7) {
+        rxLineA[index] = c;
+    } else {
+        rxLineB[index - 7] = c;
+    }
+}
+
+static char getRxChar (unsigned char index) {
+    if (index < 7) {
+        return rxLineA[index];
+    }
+    return rxLineB[index - 7];
+}
 
 static unsigned char isDigit (char c) {
     if (c >= '0' && c <= '9') {
@@ -35,7 +51,7 @@ static unsigned char isDigit (char c) {
 }
 
 static unsigned char parseTwoDigits (unsigned char index) {
-    return (unsigned char)((rxLine[index] - '0') * 10 + (rxLine[index + 1] - '0'));
+    return (unsigned char)((getRxChar(index) - '0') * 10 + (getRxChar(index + 1) - '0'));
 }
 
 static void txTick (void) {
@@ -138,7 +154,7 @@ void motorSerialTime (void) {
                     }
                 } else if (rxLen < SERIAL_TIME_LINE_MAX) {
                     txEcho = c;
-                    rxLine[rxLen] = c;
+                    setRxChar(rxLen, (char)c);
                     rxLen++;
                 } else {
                     rxLen = 0;
@@ -160,7 +176,7 @@ void motorSerialTime (void) {
             }
             break;
         case 2:
-            if (isDigit(rxLine[0]) && isDigit(rxLine[1])) {
+            if (isDigit(getRxChar(0)) && isDigit(getRxChar(1))) {
                 tempDate.day = parseTwoDigits(0);
                 state = 3;
             } else {
@@ -170,7 +186,7 @@ void motorSerialTime (void) {
             }
             break;
         case 3:
-            if (rxLine[2] == '/') {
+            if (getRxChar(2) == '/') {
                 state = 4;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -179,7 +195,7 @@ void motorSerialTime (void) {
             }
             break;
         case 4:
-            if (isDigit(rxLine[3]) && isDigit(rxLine[4])) {
+            if (isDigit(getRxChar(3)) && isDigit(getRxChar(4))) {
                 tempDate.month = parseTwoDigits(3);
                 state = 5;
             } else {
@@ -189,7 +205,7 @@ void motorSerialTime (void) {
             }
             break;
         case 5:
-            if (rxLine[5] == ' ') {
+            if (getRxChar(5) == ' ') {
                 state = 6;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -198,7 +214,7 @@ void motorSerialTime (void) {
             }
             break;
         case 6:
-            if (isDigit(rxLine[6]) && isDigit(rxLine[7])) {
+            if (isDigit(getRxChar(6)) && isDigit(getRxChar(7))) {
                 tempDate.hour = parseTwoDigits(6);
                 state = 7;
             } else {
@@ -208,7 +224,7 @@ void motorSerialTime (void) {
             }
             break;
         case 7:
-            if (rxLine[8] == ':') {
+            if (getRxChar(8) == ':') {
                 state = 8;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -217,7 +233,7 @@ void motorSerialTime (void) {
             }
             break;
         case 8:
-            if (isDigit(rxLine[9]) && isDigit(rxLine[10])) {
+            if (isDigit(getRxChar(9)) && isDigit(getRxChar(10))) {
                 tempDate.minute = parseTwoDigits(9);
                 state = 9;
             } else {
@@ -227,7 +243,7 @@ void motorSerialTime (void) {
             }
             break;
         case 9:
-            if (rxLine[11] == ':') {
+            if (getRxChar(11) == ':') {
                 state = 10;
             } else {
                 txPtr = "\r\nPlease input a correct date\r\n";
@@ -236,7 +252,7 @@ void motorSerialTime (void) {
             }
             break;
         case 10:
-            if (isDigit(rxLine[12]) && isDigit(rxLine[13])) {
+            if (isDigit(getRxChar(12)) && isDigit(getRxChar(13))) {
                 tempDate.second = parseTwoDigits(12);
                 state = 11;
             } else {
