@@ -9,12 +9,10 @@
 #define LDR_TIMEOUT_MS 5000UL
 
 static unsigned char timerHandle;
-static unsigned char lightLevel;
 
 void LDR_Init (void) {
     CONFIG_LDR;
     TI_NewTimer(&timerHandle);
-    lightLevel = 255;
 }
 
 void motorLDR (void) {
@@ -42,9 +40,7 @@ void motorLDR (void) {
                 break;
             }
             if (ADC_IsDone() == 1) {
-                lightLevel = ADC_Read();
-
-                if (lightLevel < LDR_COVER_THRESHOLD) {
+                if (ADC_Read() < LDR_COVER_THRESHOLD) {
                     Farm_NotifyRestSuccess();
                     state = 0;
                 } else if (TI_GetTics(timerHandle) >= LDR_TIMEOUT_MS) {

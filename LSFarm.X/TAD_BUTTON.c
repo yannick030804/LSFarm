@@ -22,8 +22,7 @@ void motorButton (void) {
 
     switch (state) {
         case 0:
-            if (BUTTON == 1) {
-            } else if (BUTTON == 0) {
+            if (BUTTON == 0) {
                 state = 1;
                 TI_ResetTics(timerHandle);
             }

@@ -32,7 +32,6 @@ unsigned char Farm_GetProductTotal (unsigned char species);
 void Farm_SetRebellion (unsigned char active);
 void Farm_Consume (unsigned char recipe);
 unsigned char Farm_GetNotification (FarmNotification *notification);
-void Farm_SetTimeReady (unsigned char ready);
 void Farm_SetCurrentDate (unsigned char valid, unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second);
 unsigned char Farm_ExportByte (unsigned char index);
 void Farm_BeginImportState (void);

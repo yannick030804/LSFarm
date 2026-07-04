@@ -9,41 +9,31 @@
 #include "TAD_SERIAL_TIME.h"
 
 #define FARM_STATE_MAGIC 0xA5
-#define CTRL_FLAG_INIT_SENT          0x01
-#define CTRL_FLAG_PERSISTENCE_LOADED 0x02
-#define CTRL_FLAG_RESET_PENDING      0x04
-#define CTRL_FLAG_SAVE_ACTIVE        0x08
+#define CTRL_FLAG_PERSISTENCE_LOADED 0x01
+#define CTRL_FLAG_RESET_PENDING      0x02
+#define CTRL_FLAG_SAVE_ACTIVE        0x04
 
-static const char *line;
+#define MSG_INIT_OK        "INIT OK\r\n"
+#define MSG_INIT_ERROR     "INIT ERROR\r\n"
+#define MSG_SLEEP_OK       "SLEEP OK\r\n"
+#define MSG_SLEEP_ERROR    "SLEEP ERROR\r\n"
+#define MSG_RESET_OK       "RESET OK\r\n"
+#define MSG_REBELLION_ON   "REBELLION ON\r\n"
+#define MSG_REBELLION_OFF  "REBELLION OFF\r\n"
+#define MSG_CONSUME_OK     "CONSUME OK\r\n"
+#define MSG_CONSUME_ERROR  "CONSUME ERROR\r\n"
+#define MSG_BUTTON         "S\r\n"
+#define MSG_FINISH_ANIMALS "F\r\n"
+#define MSG_UP             "U\r\n"
+#define MSG_DOWN           "D\r\n"
+#define MSG_LEFT           "L\r\n"
+#define MSG_RIGHT          "R\r\n"
+
 static const char *txLine;
 static char farmName[17];
-static unsigned char param1;
-static unsigned char param2;
-static unsigned char param3;
-static unsigned char param4;
-static unsigned char farmNameIndex;
-static unsigned char selectedNumber;
-static unsigned char selectedSpecies;
-static unsigned char sleepTypeStart;
-static unsigned char joystickEvent;
-static unsigned char animalIndex;
-static unsigned char recipeId;
 static char txBuffer[21];
 static unsigned char controllerFlags;
 static unsigned char persistenceIndex;
-
-static void resetInitData (void) {
-    farmNameIndex = 0;
-    farmName[0] = '\0';
-    param1 = 0;
-    param2 = 0;
-    param3 = 0;
-    param4 = 0;
-    selectedNumber = 0;
-    selectedSpecies = 255;
-    sleepTypeStart = 0;
-    controllerFlags &= (unsigned char)(~CTRL_FLAG_INIT_SENT);
-}
 
 static unsigned char isDigit (char c) {
     if (c >= '0' && c <= '9') {
@@ -59,65 +49,125 @@ static unsigned char isValidGenerationTime (unsigned char value) {
     return 0;
 }
 
-static unsigned char tokenRangeEquals (const char *text, unsigned char start, unsigned char end, const char *token) {
-    unsigned char i = start;
-    unsigned char j = 0;
-
-    while (i < end && token[j] != '\0') {
-        if (text[i] != token[j]) {
-            return 0;
-        }
-        i++;
-        j++;
-    }
-
-    if (i == end && token[j] == '\0') {
-        return 1;
-    }
-    return 0;
-}
-
-static unsigned char getSpeciesFromRange (const char *text, unsigned char start, unsigned char end) {
-    if (tokenRangeEquals(text, start, end, "VACA")) {
-        return 0;
-    }
-    if (tokenRangeEquals(text, start, end, "PORC")) {
-        return 1;
-    }
-    if (tokenRangeEquals(text, start, end, "CAVALL")) {
-        return 2;
-    }
-    if (tokenRangeEquals(text, start, end, "GALLINA")) {
-        return 3;
-    }
-    return 255;
-}
-
 static unsigned char appendNum (unsigned char index, unsigned char value) {
     unsigned char d;
     unsigned char started = 0;
 
-    d = value / 100;
+    d = (unsigned char)(value / 100);
     if (d != 0) {
-        txBuffer[index] = (char)('0' + d);
-        index++;
+        txBuffer[index++] = (char)('0' + d);
         started = 1;
     }
 
     d = (unsigned char)((value / 10) % 10);
     if (d != 0 || started == 1) {
-        txBuffer[index] = (char)('0' + d);
-        index++;
+        txBuffer[index++] = (char)('0' + d);
     }
 
-    txBuffer[index] = (char)('0' + (value % 10));
-    index++;
+    txBuffer[index++] = (char)('0' + (value % 10));
     return index;
 }
 
+static unsigned char parseNumber (const char *text, unsigned char *index, unsigned char *value, char endChar) {
+    unsigned char number = 0;
+    unsigned char hasDigits = 0;
+
+    while (isDigit(text[*index])) {
+        number = (unsigned char)(number * 10 + (text[*index] - '0'));
+        (*index)++;
+        hasDigits = 1;
+    }
+
+    if (hasDigits == 0 || text[*index] != endChar) {
+        return 0;
+    }
+
+    *value = number;
+    return 1;
+}
+
+static unsigned char parseInitCommand (const char *text) {
+    unsigned char i = 2;
+    unsigned char nameIndex = 0;
+    unsigned char cow;
+    unsigned char horse;
+    unsigned char pig;
+    unsigned char chicken;
+
+    while (text[i] != '$' && text[i] != '\0') {
+        if (nameIndex < sizeof(farmName) - 1) {
+            farmName[nameIndex++] = text[i];
+        }
+        i++;
+    }
+
+    if (nameIndex == 0 || text[i] != '$') {
+        return 0;
+    }
+
+    farmName[nameIndex] = '\0';
+    i++;
+
+    if (parseNumber(text, &i, &cow, '$') == 0) {
+        return 0;
+    }
+    i++;
+    if (parseNumber(text, &i, &horse, '$') == 0) {
+        return 0;
+    }
+    i++;
+    if (parseNumber(text, &i, &pig, '$') == 0) {
+        return 0;
+    }
+    i++;
+    if (parseNumber(text, &i, &chicken, '\0') == 0) {
+        return 0;
+    }
+
+    if (isValidGenerationTime(cow) == 0 || isValidGenerationTime(horse) == 0 ||
+        isValidGenerationTime(pig) == 0 || isValidGenerationTime(chicken) == 0) {
+        return 0;
+    }
+
+    Farm_RequestConfigure(farmName, cow, horse, pig, chicken);
+    return 1;
+}
+
+static unsigned char parseSleepCommand (const char *text) {
+    unsigned char i;
+    unsigned char species;
+    unsigned char number;
+
+    if (text[2] == 'V' && text[3] == 'A' && text[4] == 'C' && text[5] == 'A' && text[6] == '$') {
+        species = 0;
+        i = 7;
+    } else if (text[2] == 'P' && text[3] == 'O' && text[4] == 'R' && text[5] == 'C' && text[6] == '$') {
+        species = 1;
+        i = 7;
+    } else if (text[2] == 'C' && text[3] == 'A' && text[4] == 'V' && text[5] == 'A' &&
+               text[6] == 'L' && text[7] == 'L' && text[8] == '$') {
+        species = 2;
+        i = 9;
+    } else if (text[2] == 'G' && text[3] == 'A' && text[4] == 'L' && text[5] == 'L' &&
+               text[6] == 'I' && text[7] == 'N' && text[8] == 'A' && text[9] == '$') {
+        species = 3;
+        i = 10;
+    } else {
+        return 0;
+    }
+
+    if (parseNumber(text, &i, &number, '\0') == 0 || number == 0) {
+        return 0;
+    }
+
+    Farm_RequestSelectAnimal(species, number);
+    return 1;
+}
+
 static void Controller_ServiceFarm (void) {
-    Farm_SetTimeReady(SerialTime_IsConfigured());
-    if (SerialTime_IsConfigured() == 1) {
+    unsigned char timeConfigured = SerialTime_IsConfigured();
+
+    if (timeConfigured == 1) {
         Farm_SetCurrentDate(1, SerialTime_GetDay(), SerialTime_GetMonth(), SerialTime_GetHour(), SerialTime_GetMinute(), SerialTime_GetSecond());
     } else {
         Farm_SetCurrentDate(0, 0, 0, 0, 0, 0);
@@ -168,19 +218,14 @@ static void buildProductsLine (void) {
     txBuffer[0] = 'P';
     txBuffer[1] = ':';
     index = appendNum(index, Farm_GetProductTotal(0));
-    txBuffer[index] = '$';
-    index++;
+    txBuffer[index++] = '$';
     index = appendNum(index, Farm_GetProductTotal(1));
-    txBuffer[index] = '$';
-    index++;
+    txBuffer[index++] = '$';
     index = appendNum(index, Farm_GetProductTotal(3));
-    txBuffer[index] = '$';
-    index++;
+    txBuffer[index++] = '$';
     index = appendNum(index, Farm_GetProductTotal(2));
-    txBuffer[index] = '\r';
-    index++;
-    txBuffer[index] = '\n';
-    index++;
+    txBuffer[index++] = '\r';
+    txBuffer[index++] = '\n';
     txBuffer[index] = '\0';
 }
 
@@ -207,16 +252,12 @@ static void buildAnimalLine (unsigned char indexAnimal) {
     }
 
     while (*name != '\0') {
-        txBuffer[index] = *name;
-        index++;
-        name++;
+        txBuffer[index++] = *name++;
     }
 
-    txBuffer[index] = '$';
-    index++;
+    txBuffer[index++] = '$';
     index = appendNum(index, number);
-    txBuffer[index] = '$';
-    index++;
+    txBuffer[index++] = '$';
 
     if (critical == 1) {
         name = "SLEEP";
@@ -225,265 +266,153 @@ static void buildAnimalLine (unsigned char indexAnimal) {
     }
 
     while (*name != '\0') {
-        txBuffer[index] = *name;
-        index++;
-        name++;
+        txBuffer[index++] = *name++;
     }
 
-    txBuffer[index] = '\r';
-    index++;
-    txBuffer[index] = '\n';
-    index++;
+    txBuffer[index++] = '\r';
+    txBuffer[index++] = '\n';
     txBuffer[index] = '\0';
 }
 
 void Controller_Init (void) {
-    resetInitData();
+    farmName[0] = '\0';
     controllerFlags = 0;
     persistenceIndex = 0;
 }
 
 void motorController (void) {
     static unsigned char state = 0;
-    static unsigned char i = 0;
+    static unsigned char animalIndex = 0;
+    const char *line;
+    unsigned char recipeId;
 
     switch (state) {
         case 0:
             Controller_ServiceFarm();
             line = SJ_GetLine();
             if (line != 0) {
-                resetInitData();
-                i = 0;
-                state = 1;
+                if (line[0] == 'I' && line[1] == ':') {
+                    if (parseInitCommand(line) == 1) {
+                        state = 1;
+                    } else {
+                        txLine = MSG_INIT_ERROR;
+                        state = 5;
+                    }
+                } else if (line[0] == 'S' && line[1] == ':') {
+                    if (parseSleepCommand(line) == 1) {
+                        state = 2;
+                    } else {
+                        txLine = MSG_SLEEP_ERROR;
+                        state = 5;
+                    }
+                } else if (line[0] == 'G' && line[1] == '\0') {
+                    buildProductsLine();
+                    txLine = txBuffer;
+                    state = 5;
+                } else if (line[0] == 'A' && line[1] == '\0') {
+                    animalIndex = 0;
+                    state = 4;
+                } else if (line[0] == 'R' && line[1] == '\0') {
+                    Farm_Reset();
+                    Heartbeat_SetRebellion(0);
+                    controllerFlags |= CTRL_FLAG_RESET_PENDING;
+                    txLine = MSG_RESET_OK;
+                    state = 5;
+                } else if (line[0] == 'B' && line[1] == '\0') {
+                    Farm_SetRebellion(1);
+                    Heartbeat_SetRebellion(1);
+                    txLine = MSG_REBELLION_ON;
+                    state = 5;
+                } else if (line[0] == 'P' && line[1] == '\0') {
+                    Farm_SetRebellion(0);
+                    Heartbeat_SetRebellion(0);
+                    txLine = MSG_REBELLION_OFF;
+                    state = 5;
+                } else if (line[0] == 'C' && line[1] == ':' && isDigit(line[2]) && line[3] == '\0') {
+                    recipeId = (unsigned char)(line[2] - '0');
+                    if (recipeId <= 3) {
+                        Farm_Consume(recipeId);
+                        txLine = MSG_CONSUME_OK;
+                    } else {
+                        txLine = MSG_CONSUME_ERROR;
+                    }
+                    state = 5;
+                } else {
+                    txLine = MSG_INIT_ERROR;
+                    state = 5;
+                }
             } else if (getButton() == 1) {
-                txLine = "S\r\n";
-                state = 20;
+                txLine = MSG_BUTTON;
+                state = 5;
             } else {
-                joystickEvent = Joystick_GetEvent();
-                if (joystickEvent != JOY_EVT_NONE) {
-                    state = 21;
+                recipeId = Joystick_GetEvent();
+                if (recipeId == JOY_EVT_UP) {
+                    txLine = MSG_UP;
+                    state = 5;
+                } else if (recipeId == JOY_EVT_DOWN) {
+                    txLine = MSG_DOWN;
+                    state = 5;
+                } else if (recipeId == JOY_EVT_LEFT) {
+                    txLine = MSG_LEFT;
+                    state = 5;
+                } else if (recipeId == JOY_EVT_RIGHT) {
+                    txLine = MSG_RIGHT;
+                    state = 5;
                 }
             }
             break;
 
         case 1:
-            if (line[0] == 'I' && line[1] == ':') {
-                i = 2;
-                state = 2;
-            } else if (line[0] == 'G' && line[1] == '\0') {
-                state = 16;
-            } else if (line[0] == 'A' && line[1] == '\0') {
-                animalIndex = 0;
-                state = 17;
-            } else if (line[0] == 'R' && line[1] == '\0') {
-                Farm_Reset();
-                Heartbeat_SetRebellion(0);
-                controllerFlags |= CTRL_FLAG_RESET_PENDING;
-                txLine = "RESET OK\r\n";
-                state = 20;
-            } else if (line[0] == 'B' && line[1] == '\0') {
-                Farm_SetRebellion(1);
-                Heartbeat_SetRebellion(1);
-                txLine = "REBELLION ON\r\n";
-                state = 20;
-            } else if (line[0] == 'P' && line[1] == '\0') {
-                Farm_SetRebellion(0);
-                Heartbeat_SetRebellion(0);
-                txLine = "REBELLION OFF\r\n";
-                state = 20;
-            } else if (line[0] == 'C' && line[1] == ':' && isDigit(line[2]) && line[3] == '\0') {
-                recipeId = (unsigned char)(line[2] - '0');
-                state = 19;
-            } else if (line[0] == 'S' && line[1] == ':') {
-                selectedNumber = 0;
-                selectedSpecies = 255;
-                i = 2;
-                sleepTypeStart = 2;
-                state = 9;
-            } else {
-                state = 8;
-            }
-            break;
-        case 2:
-            if (line[i] == '\0') {
-                state = 8;
-            } else if (line[i] == '$') {
-                farmName[farmNameIndex] = '\0';
-                i++;
-                state = 3;
-            } else {
-                if (farmNameIndex < sizeof(farmName) - 1) {
-                    farmName[farmNameIndex] = line[i];
-                    farmNameIndex++;
-                }
-                i++;
-            }
-            break;
-        case 3:
-            if (isDigit(line[i])) {
-                param1 = param1 * 10 + (line[i] - '0');
-                i++;
-            } else if (line[i] == '$') {
-                i++;
-                state = 4;
-            } else {
-                state = 8;
-            }
-            break;
-        case 4:
-            if (isDigit(line[i])) {
-                param2 = param2 * 10 + (line[i] - '0');
-                i++;
-            } else if (line[i] == '$') {
-                i++;
-                state = 5;
-            } else {
-                state = 8;
-            }
-            break;
-        case 5:
-            if (isDigit(line[i])) {
-                param3 = param3 * 10 + (line[i] - '0');
-                i++;
-            } else if (line[i] == '$') {
-                i++;
-                state = 6;
-            } else {
-                state = 8;
-            }
-            break;
-        case 6:
-            if (isDigit(line[i])) {
-                param4 = param4 * 10 + (line[i] - '0');
-                i++;
-            } else if (line[i] == '\0') {
-                state = 7;
-            } else {
-                state = 8;
-            }
-            break;
-        case 7:
-            if (farmName[0] == '\0' || isValidGenerationTime(param1) == 0 || isValidGenerationTime(param2) == 0 || isValidGenerationTime(param3) == 0 || isValidGenerationTime(param4) == 0) {
-                state = 8;
-                break;
-            }
-            if ((controllerFlags & CTRL_FLAG_INIT_SENT) == 0) {
-                Farm_RequestConfigure(farmName, param1, param2, param3, param4);
-                controllerFlags |= CTRL_FLAG_INIT_SENT;
-            }
             if (Farm_IsConfigured() == 1) {
-                txLine = "INIT OK\r\n";
-                state = 20;
+                txLine = MSG_INIT_OK;
+                state = 5;
             }
             break;
 
-        case 8:
-            txLine = "INIT ERROR\r\n";
-            state = 20;
-            break;
-        case 9:
-            if (line[i] == '\0') {
-                state = 15;
-            } else if (line[i] == '$') {
-                selectedSpecies = getSpeciesFromRange(line, sleepTypeStart, i);
-                if (selectedSpecies == 255) {
-                    state = 15;
-                } else {
-                    i++;
-                    state = 10;
-                }
-            } else if (i - sleepTypeStart < 7) {
-                i++;
-            } else {
-                state = 15;
-            }
-            break;
-        case 10:
-            if (isDigit(line[i])) {
-                selectedNumber = selectedNumber * 10 + (line[i] - '0');
-                i++;
-            } else if (line[i] == '\0' && selectedNumber > 0) {
-                Farm_RequestSelectAnimal(selectedSpecies, selectedNumber);
-                state = 11;
-            } else {
-                state = 15;
-            }
-            break;
-        case 11:
+        case 2:
             if (Farm_IsSearchFinished() == 1) {
                 if (Farm_IsAnimalFound() == 1) {
-                    state = 13;
+                    state = 3;
                 } else {
-                    state = 15;
+                    txLine = MSG_SLEEP_ERROR;
+                    state = 5;
                 }
             }
             break;
-        case 13:
+
+        case 3:
             if (Farm_IsRestFinished() == 1) {
                 if (Farm_IsRestSuccess() == 1) {
-                    state = 14;
+                    txLine = MSG_SLEEP_OK;
                 } else {
-                    state = 15;
+                    txLine = MSG_SLEEP_ERROR;
                 }
+                state = 5;
             }
             break;
-        case 14:
-            txLine = "SLEEP OK\r\n";
-            state = 20;
-            break;
-        case 15:
-            txLine = "SLEEP ERROR\r\n";
-            state = 20;
-            break;
-        case 16:
-            buildProductsLine();
-            txLine = txBuffer;
-            state = 20;
-            break;
-        case 17:
+
+        case 4:
             if (animalIndex < Farm_GetAnimalCount()) {
                 buildAnimalLine(animalIndex);
                 txLine = txBuffer;
-                state = 18;
+                state = 6;
             } else {
-                txLine = "F\r\n";
-                state = 20;
+                txLine = MSG_FINISH_ANIMALS;
+                state = 5;
             }
             break;
-        case 18:
-            if (SJ_PutString(txLine)) {
+
+        case 5:
+            if (SJ_PutString(txLine) == 1) {
+                state = 0;
+            }
+            break;
+
+        case 6:
+            if (SJ_PutString(txLine) == 1) {
                 animalIndex++;
-                state = 17;
+                state = 4;
             }
-            break;
-        case 19:
-            if (recipeId <= 3) {
-                Farm_Consume(recipeId);
-                txLine = "CONSUME OK\r\n";
-            } else {
-                txLine = "CONSUME ERROR\r\n";
-            }
-            state = 20;
-            break;
-        case 20:
-            if (SJ_PutString(txLine)) {
-                state = 0;
-            }
-            break;
-        case 21:
-            if (joystickEvent == JOY_EVT_UP) {
-                txLine = "U\r\n";
-            } else if (joystickEvent == JOY_EVT_DOWN) {
-                txLine = "D\r\n";
-            } else if (joystickEvent == JOY_EVT_LEFT) {
-                txLine = "L\r\n";
-            } else if (joystickEvent == JOY_EVT_RIGHT) {
-                txLine = "R\r\n";
-            } else {
-                state = 0;
-                break;
-            }
-            state = 20;
             break;
     }
 }

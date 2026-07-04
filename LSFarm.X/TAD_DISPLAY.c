@@ -111,22 +111,29 @@ static void Display_ShowNotification (const FarmNotification *notification) {
 }
 
 static void Display_ShowIdleScreen (void) {
+    unsigned char farmConfigured = Farm_IsConfigured();
+    unsigned char timeConfigured = SerialTime_IsConfigured();
+    unsigned char day;
+    unsigned char month;
     unsigned char index;
 
-    if (Farm_IsConfigured() == 0 && SerialTime_IsConfigured() == 0) {
+    if (farmConfigured == 0 && timeConfigured == 0) {
         Display_ShowText("Esperando", "Init y Hora");
         return;
     }
 
-    if (Farm_IsConfigured() == 0) {
+    if (farmConfigured == 0) {
         Display_ShowText("Esperando Init", "");
         return;
     }
 
-    if (SerialTime_IsConfigured() == 0) {
+    if (timeConfigured == 0) {
         Display_ShowText(Farm_GetName(), "Falta Hora");
         return;
     }
+
+    day = SerialTime_GetDay();
+    month = SerialTime_GetMonth();
 
     displayLine[0] = 'F';
     displayLine[1] = 'e';
@@ -134,11 +141,11 @@ static void Display_ShowIdleScreen (void) {
     displayLine[3] = 'h';
     displayLine[4] = 'a';
     displayLine[5] = ' ';
-    displayLine[6] = (char)('0' + (SerialTime_GetDay() / 10));
-    displayLine[7] = (char)('0' + (SerialTime_GetDay() % 10));
+    displayLine[6] = (char)('0' + (day / 10));
+    displayLine[7] = (char)('0' + (day % 10));
     displayLine[8] = '/';
-    displayLine[9] = (char)('0' + (SerialTime_GetMonth() / 10));
-    displayLine[10] = (char)('0' + (SerialTime_GetMonth() % 10));
+    displayLine[9] = (char)('0' + (month / 10));
+    displayLine[10] = (char)('0' + (month % 10));
     for (index = 11; index < 16; index++) {
         displayLine[index] = ' ';
     }
@@ -152,11 +159,15 @@ void Display_Init (void) {
 
 void motorDisplay (void) {
     FarmNotification notification;
+    unsigned char timeConfigured;
+    unsigned char day;
+    unsigned char month;
 
     switch (DISPLAY_GET_STATE()) {
         case 0:
             Display_ShowIdleScreen();
-            if (SerialTime_IsConfigured() == 1) {
+            timeConfigured = SerialTime_IsConfigured();
+            if (timeConfigured == 1) {
                 DISPLAY_SET_LAST_DAY(SerialTime_GetDay());
                 DISPLAY_SET_LAST_MONTH(SerialTime_GetMonth());
             } else {
@@ -173,14 +184,19 @@ void motorDisplay (void) {
                 break;
             }
 
-            if (Farm_IsConfigured() == 0 || SerialTime_IsConfigured() == 0) {
+            timeConfigured = SerialTime_IsConfigured();
+            if (Farm_IsConfigured() == 0 || timeConfigured == 0) {
                 Display_ShowIdleScreen();
                 DISPLAY_SET_LAST_DAY(255);
                 DISPLAY_SET_LAST_MONTH(255);
-            } else if (SerialTime_GetDay() != DISPLAY_GET_LAST_DAY() || SerialTime_GetMonth() != DISPLAY_GET_LAST_MONTH()) {
-                Display_ShowIdleScreen();
-                DISPLAY_SET_LAST_DAY(SerialTime_GetDay());
-                DISPLAY_SET_LAST_MONTH(SerialTime_GetMonth());
+            } else {
+                day = SerialTime_GetDay();
+                month = SerialTime_GetMonth();
+                if (day != DISPLAY_GET_LAST_DAY() || month != DISPLAY_GET_LAST_MONTH()) {
+                    Display_ShowIdleScreen();
+                    DISPLAY_SET_LAST_DAY(day);
+                    DISPLAY_SET_LAST_MONTH(month);
+                }
             }
             break;
         case 2:
