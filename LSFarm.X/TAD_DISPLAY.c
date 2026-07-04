@@ -6,7 +6,11 @@
 #include "TAD_TIMER.h"
 
 #define DISPLAY_MESSAGE_TIME 3000UL
-#define DISPLAY_TIMER_HANDLE() ((unsigned char)displayLine[16])
+#define DISPLAY_TIMER_MASK 0x07
+#define DISPLAY_STATE_SHIFT 3
+#define DISPLAY_TIMER_HANDLE() ((unsigned char)(displayLine[16] & DISPLAY_TIMER_MASK))
+#define DISPLAY_GET_STATE() ((unsigned char)((displayLine[16] >> DISPLAY_STATE_SHIFT) & 0x03))
+#define DISPLAY_SET_STATE(value) (displayLine[16] = (char)((displayLine[16] & DISPLAY_TIMER_MASK) | ((value) << DISPLAY_STATE_SHIFT)))
 
 static char displayLine[17];
 
@@ -139,15 +143,15 @@ static void Display_ShowIdleScreen (void) {
 
 void Display_Init (void) {
     TI_NewTimer((unsigned char *)&displayLine[16]);
+    DISPLAY_SET_STATE(0);
 }
 
 void motorDisplay (void) {
-    static unsigned char state = 0;
     static unsigned char lastDay = 255;
     static unsigned char lastMonth = 255;
     FarmNotification notification;
 
-    switch (state) {
+    switch (DISPLAY_GET_STATE()) {
         case 0:
             Display_ShowIdleScreen();
             if (SerialTime_IsConfigured() == 1) {
@@ -157,13 +161,13 @@ void motorDisplay (void) {
                 lastDay = 255;
                 lastMonth = 255;
             }
-            state = 1;
+            DISPLAY_SET_STATE(1);
             break;
         case 1:
             if (Farm_GetNotification(&notification) == 1) {
                 Display_ShowNotification(&notification);
                 TI_ResetTics(DISPLAY_TIMER_HANDLE());
-                state = 2;
+                DISPLAY_SET_STATE(2);
                 break;
             }
 
@@ -183,7 +187,7 @@ void motorDisplay (void) {
                     Display_ShowNotification(&notification);
                     TI_ResetTics(DISPLAY_TIMER_HANDLE());
                 } else {
-                    state = 0;
+                    DISPLAY_SET_STATE(0);
                 }
             }
             break;
