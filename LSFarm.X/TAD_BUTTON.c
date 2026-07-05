@@ -3,11 +3,17 @@
 #include "TAD_TIMER.h"
 
 static unsigned char timerHandle;
-unsigned char buttonPressed;
+static unsigned char isPressed;
 
 void Button_Init (void) {
     CONFIG_BTN;
     TI_NewTimer(&timerHandle);
+}
+
+unsigned char getButton (void) {
+    unsigned char aux = isPressed;
+    isPressed = 0;
+    return aux;
 }
 
 void motorButton (void) {
@@ -22,7 +28,7 @@ void motorButton (void) {
             break;
         case 1:
             if (BUTTON == 0 && TI_GetTics(timerHandle) >= REBOUNDS) {
-                buttonPressed = 1;
+                isPressed = 1;
                 state++;
                 TI_ResetTics(timerHandle);
             }

@@ -12,6 +12,6 @@ unsigned char TI_NewTimer (unsigned char *TimerHandle);
 
 void TI_ResetTics (unsigned char TimerHandle);
 
-unsigned long TI_GetTics (unsigned char TimerHandle);
+unsigned int TI_GetTics (unsigned char TimerHandle);
 
 #endif

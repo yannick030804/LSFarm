@@ -29,9 +29,9 @@
 #define REPLY_LEFT          13
 #define REPLY_RIGHT         14
 
+#define txBuffer serialJavaBuffer
+
 static const char *txLine;
-static char controllerFarmName[17];
-static char txBuffer[21];
 static unsigned char controllerFlags;
 static unsigned char persistenceIndex;
 
@@ -227,26 +227,23 @@ static unsigned char parseNumber (const char *text, unsigned char *index, unsign
     return 1;
 }
 
-static unsigned char parseInitCommand (const char *text) {
+static unsigned char parseInitCommand (char *text) {
     unsigned char i = 2;
-    unsigned char nameIndex = 0;
+    unsigned char nameEnd;
     unsigned char cow;
     unsigned char horse;
     unsigned char pig;
     unsigned char chicken;
 
     while (text[i] != '$' && text[i] != '\0') {
-        if (nameIndex < sizeof(controllerFarmName) - 1) {
-            controllerFarmName[nameIndex++] = text[i];
-        }
         i++;
     }
 
-    if (nameIndex == 0 || text[i] != '$') {
+    if (i == 2 || text[i] != '$') {
         return 0;
     }
 
-    controllerFarmName[nameIndex] = '\0';
+    nameEnd = i;
     i++;
 
     if (parseNumber(text, &i, &cow, '$') == 0) {
@@ -270,7 +267,8 @@ static unsigned char parseInitCommand (const char *text) {
         return 0;
     }
 
-    Farm_RequestConfigure(controllerFarmName, cow, horse, pig, chicken);
+    text[nameEnd] = '\0';
+    Farm_RequestConfigure(&text[2], cow, horse, pig, chicken);
     return 1;
 }
 
@@ -450,10 +448,10 @@ static void buildAnimalLine (unsigned char indexAnimal) {
     txBuffer[index] = '\0';
 }
 
-static unsigned char Controller_ProcessLine (const char *line, unsigned char *animalIndex) {
+static unsigned char Controller_ProcessLine (char *line, unsigned char *animalIndex) {
     unsigned char recipeId;
 
-    Controller_SetReply(REPLY_INIT_ERROR);
+    txLine = 0;
 
     switch (line[0]) {
         case 'I':
@@ -514,6 +512,10 @@ static unsigned char Controller_ProcessLine (const char *line, unsigned char *an
             break;
     }
 
+    if (txLine == 0) {
+        Controller_SetReply(REPLY_INIT_ERROR);
+    }
+
     return 5;
 }
 
@@ -547,7 +549,7 @@ static unsigned char Controller_ProcessInputs (void) {
 void motorController (void) {
     static unsigned char state = 0;
     static unsigned char animalIndex = 0;
-    const char *line;
+    char *line;
 
     switch (state) {
         case 0:
@@ -555,7 +557,7 @@ void motorController (void) {
             line = SJ_GetLine();
             if (line != 0) {
                 state = Controller_ProcessLine(line, &animalIndex);
-            } else {
+            } else if (serialJavaLineIndex == 0) {
                 state = Controller_ProcessInputs();
             }
             break;

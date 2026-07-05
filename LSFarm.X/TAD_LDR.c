@@ -6,7 +6,7 @@
 
 #define LDR_ADC_CHANNEL 3
 #define LDR_COVER_THRESHOLD 100
-#define LDR_TIMEOUT_MS 5000UL
+#define LDR_TIMEOUT_MS 5000
 
 static unsigned char timerHandle;
 
