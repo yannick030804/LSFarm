@@ -9,7 +9,6 @@
 #include "TAD_SERIAL_TIME.h"
 
 #define FARM_STATE_MAGIC 0xA5
-#define INVALID_ANIMAL_INDEX 0xFF
 #define CTRL_FLAG_PERSISTENCE_LOADED 0x01
 #define CTRL_FLAG_RESET_PENDING      0x02
 #define CTRL_FLAG_SAVE_ACTIVE        0x04
@@ -280,22 +279,39 @@ static unsigned char parseSleepCommand (const char *text) {
     unsigned char species;
     unsigned char number;
 
-    if (text[2] == 'V' && text[3] == 'A' && text[4] == 'C' && text[5] == 'A' && text[6] == '$') {
-        species = 0;
-        i = 7;
-    } else if (text[2] == 'P' && text[3] == 'O' && text[4] == 'R' && text[5] == 'C' && text[6] == '$') {
-        species = 1;
-        i = 7;
-    } else if (text[2] == 'C' && text[3] == 'A' && text[4] == 'V' && text[5] == 'A' &&
-               text[6] == 'L' && text[7] == 'L' && text[8] == '$') {
-        species = 2;
-        i = 9;
-    } else if (text[2] == 'G' && text[3] == 'A' && text[4] == 'L' && text[5] == 'L' &&
-               text[6] == 'I' && text[7] == 'N' && text[8] == 'A' && text[9] == '$') {
-        species = 3;
-        i = 10;
-    } else {
-        return 0;
+    switch (text[2]) {
+        case 'V':
+            if (text[3] == 'A' && text[4] == 'C' && text[5] == 'A' && text[6] == '$') {
+                species = 0;
+                i = 7;
+                break;
+            }
+            return 0;
+        case 'P':
+            if (text[3] == 'O' && text[4] == 'R' && text[5] == 'C' && text[6] == '$') {
+                species = 1;
+                i = 7;
+                break;
+            }
+            return 0;
+        case 'C':
+            if (text[3] == 'A' && text[4] == 'V' && text[5] == 'A' &&
+                text[6] == 'L' && text[7] == 'L' && text[8] == '$') {
+                species = 2;
+                i = 9;
+                break;
+            }
+            return 0;
+        case 'G':
+            if (text[3] == 'A' && text[4] == 'L' && text[5] == 'L' &&
+                text[6] == 'I' && text[7] == 'N' && text[8] == 'A' && text[9] == '$') {
+                species = 3;
+                i = 10;
+                break;
+            }
+            return 0;
+        default:
+            return 0;
     }
 
     if (parseNumber(text, &i, &number, '\0') == 0 || number == 0) {
@@ -364,7 +380,9 @@ static void buildProductsLine (void) {
     index = appendNum(index, Farm_GetProductTotal(3));
     txBuffer[index++] = '$';
     index = appendNum(index, Farm_GetProductTotal(2));
-    Controller_EndReply(index);
+    txBuffer[index++] = '\r';
+    txBuffer[index++] = '\n';
+    txBuffer[index] = '\0';
 }
 
 static void buildAnimalLine (unsigned char indexAnimal) {
@@ -423,7 +441,9 @@ static void buildAnimalLine (unsigned char indexAnimal) {
         txBuffer[index++] = 'E';
     }
 
-    Controller_EndReply(index);
+    txBuffer[index++] = '\r';
+    txBuffer[index++] = '\n';
+    txBuffer[index] = '\0';
 }
 
 static unsigned char Controller_ProcessLine (const char *line, unsigned char *animalIndex) {
@@ -502,21 +522,19 @@ static unsigned char Controller_ProcessInputs (void) {
     }
 
     recipeId = Joystick_GetEvent();
-    if (recipeId == JOY_EVT_UP) {
-        Controller_SetReply(REPLY_UP);
-        return 5;
-    }
-    if (recipeId == JOY_EVT_DOWN) {
-        Controller_SetReply(REPLY_DOWN);
-        return 5;
-    }
-    if (recipeId == JOY_EVT_LEFT) {
-        Controller_SetReply(REPLY_LEFT);
-        return 5;
-    }
-    if (recipeId == JOY_EVT_RIGHT) {
-        Controller_SetReply(REPLY_RIGHT);
-        return 5;
+    switch (recipeId) {
+        case JOY_EVT_UP:
+            Controller_SetReply(REPLY_UP);
+            return 5;
+        case JOY_EVT_DOWN:
+            Controller_SetReply(REPLY_DOWN);
+            return 5;
+        case JOY_EVT_LEFT:
+            Controller_SetReply(REPLY_LEFT);
+            return 5;
+        case JOY_EVT_RIGHT:
+            Controller_SetReply(REPLY_RIGHT);
+            return 5;
     }
 
     return 0;
@@ -530,7 +548,6 @@ void motorController (void) {
     switch (state) {
         case 0:
             Controller_ServiceFarm();
-            animalIndex = INVALID_ANIMAL_INDEX;
             line = SJ_GetLine();
             if (line != 0) {
                 state = Controller_ProcessLine(line, &animalIndex);
@@ -542,7 +559,6 @@ void motorController (void) {
         case 1:
             if (Farm_IsConfigured() == 1) {
                 Controller_SetReply(REPLY_INIT_OK);
-                animalIndex = INVALID_ANIMAL_INDEX;
                 state = 5;
             }
             break;
@@ -553,7 +569,6 @@ void motorController (void) {
                     state = 3;
                 } else {
                     Controller_SetReply(REPLY_SLEEP_ERROR);
-                    animalIndex = INVALID_ANIMAL_INDEX;
                     state = 5;
                 }
             }
@@ -566,7 +581,6 @@ void motorController (void) {
                 } else {
                     Controller_SetReply(REPLY_SLEEP_ERROR);
                 }
-                animalIndex = INVALID_ANIMAL_INDEX;
                 state = 5;
             }
             break;
@@ -575,22 +589,23 @@ void motorController (void) {
             if (animalIndex < Farm_GetAnimalCount()) {
                 buildAnimalLine(animalIndex);
                 txLine = txBuffer;
-                state = 5;
+                state = 6;
             } else {
                 Controller_SetReply(REPLY_FINISH_ANIMALS);
-                animalIndex = INVALID_ANIMAL_INDEX;
                 state = 5;
             }
             break;
 
         case 5:
             if (SJ_PutString(txLine) == 1) {
-                if (animalIndex == INVALID_ANIMAL_INDEX) {
-                    state = 0;
-                } else {
-                    animalIndex++;
-                    state = 4;
-                }
+                state = 0;
+            }
+            break;
+
+        case 6:
+            if (SJ_PutString(txLine) == 1) {
+                animalIndex++;
+                state = 4;
             }
             break;
     }

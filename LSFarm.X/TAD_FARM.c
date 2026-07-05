@@ -29,14 +29,14 @@
 #define ANIMAL_IS_CRITICAL(index) ((unsigned char)((animalInfo[(index)] & ANIMAL_CRITICAL_MASK) != 0))
 
 static unsigned char timerHandle;
-static unsigned char configured;
+unsigned char configured;
 static unsigned char rebellion;
 static unsigned char resetRequested;
-static unsigned char dirtyState;
+unsigned char dirtyState;
 static unsigned char currentDateValid;
 static unsigned long currentStamp;
 
-static char farmName[FARM_MAX_NAME + 1];
+char farmName[FARM_MAX_NAME + 1];
 static const char *pendingName;
 static unsigned char pendingTimes[FARM_NUM_SPECIES];
 static unsigned char configRequested;
@@ -44,19 +44,19 @@ static unsigned char configRequested;
 static unsigned char generationTimes[FARM_NUM_SPECIES];
 static unsigned char animalCounts[FARM_NUM_SPECIES];
 static unsigned char criticalCounts[FARM_NUM_SPECIES];
-static unsigned char productCounts[FARM_NUM_SPECIES];
+unsigned char productCounts[FARM_NUM_SPECIES];
 
-static unsigned char totalAnimals;
+unsigned char totalAnimals;
 
 static unsigned char selectedAnimalSpecies;
 static unsigned char selectedAnimalNumber;
 static signed char selectedAnimalIndex;
 static unsigned char searchRequested;
-static unsigned char searchFinished;
-static unsigned char searchFound;
-static unsigned char restRequestPending;
-static unsigned char restFinished;
-static unsigned char restSuccess;
+unsigned char searchFinished;
+unsigned char searchFound;
+unsigned char restRequestPending;
+unsigned char restFinished;
+unsigned char restSuccess;
 
 static unsigned char lastGeneration[FARM_NUM_SPECIES];
 static unsigned char lastProduct[FARM_NUM_SPECIES];
@@ -101,6 +101,11 @@ void motorFarm (void) {
 
     if (resetRequested == 1) {
         state = 0;
+        copyIndex = 0;
+        speciesIndex = 0;
+        animalIndex = 0;
+        speciesNumber = 0;
+        now = 0;
         resetRequested = 0;
     }
 
@@ -228,27 +233,8 @@ void Farm_RequestSelectAnimal (unsigned char species, unsigned char number) {
     Farm_ResetSelectionState();
     selectedAnimalSpecies = species;
     selectedAnimalNumber = number;
+    selectedAnimalIndex = -1;
     searchRequested = 1;
-}
-
-unsigned char Farm_IsSearchFinished (void) {
-    return searchFinished;
-}
-
-unsigned char Farm_IsAnimalFound (void) {
-    return searchFound;
-}
-
-unsigned char Farm_IsRestRequestPending (void) {
-    return restRequestPending;
-}
-
-unsigned char Farm_IsRestFinished (void) {
-    return restFinished;
-}
-
-unsigned char Farm_IsRestSuccess (void) {
-    return restSuccess;
 }
 
 void Farm_NotifyRestSuccess (void) {
@@ -284,18 +270,6 @@ void Farm_NotifyRestTimeout (void) {
     restFinished = 1;
 }
 
-unsigned char Farm_IsConfigured (void) {
-    return configured;
-}
-
-const char *Farm_GetName (void) {
-    return farmName;
-}
-
-unsigned char Farm_GetAnimalCount (void) {
-    return totalAnimals;
-}
-
 void Farm_GetAnimal (unsigned char index, unsigned char *species, unsigned char *number, unsigned char *critical) {
     unsigned char i;
     unsigned char count = 0;
@@ -310,10 +284,6 @@ void Farm_GetAnimal (unsigned char index, unsigned char *species, unsigned char 
     }
 
     *number = count;
-}
-
-unsigned char Farm_GetProductTotal (unsigned char species) {
-    return PRODUCT_COUNT(species);
 }
 
 void Farm_SetRebellion (unsigned char active) {
@@ -434,14 +404,6 @@ void Farm_EndImportState (void) {
 
     Farm_RecountAnimals();
     configured = 1;
-    dirtyState = 0;
-}
-
-unsigned char Farm_IsDirty (void) {
-    return dirtyState;
-}
-
-void Farm_ClearDirty (void) {
     dirtyState = 0;
 }
 
