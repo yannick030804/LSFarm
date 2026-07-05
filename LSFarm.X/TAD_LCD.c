@@ -110,18 +110,18 @@ void motorLCD (void) {
         case 0:
             LCD_SendByte(0x80, 0);
             scan = 0;
-            state = 1;
+            state++;
             break;
         case 1:
             LCD_SendByte(frame[scan], 1);
             scan++;
             if (scan >= 16) {
-                state = 2;
+                state++;
             }
             break;
         case 2:
             LCD_SendByte(0xC0, 0);
-            state = 3;
+            state++;
             break;
         case 3:
             LCD_SendByte(frame[scan], 1);

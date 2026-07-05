@@ -51,24 +51,24 @@ void motorJoystick (void) {
     switch (state) {
         case 0:
             if (ADC_Start(JOYSTICK_X_CHANNEL) == 1) {
-                state = 1;
+                state++;
             }
             break;
         case 1:
             if (ADC_IsDone() == 1) {
                 adcX = ADC_Read();
-                state = 2;
+                state++;
             }
             break;
         case 2:
             if (ADC_Start(JOYSTICK_Y_CHANNEL) == 1) {
-                state = 3;
+                state++;
             }
             break;
         case 3:
             if (ADC_IsDone() == 1) {
                 adcY = ADC_Read();
-                state = 4;
+                state++;
             }
             break;
         case 4:

@@ -23,14 +23,14 @@ void motorButton (void) {
     switch (state) {
         case 0:
             if (BUTTON == 0) {
-                state = 1;
+                state++;
                 TI_ResetTics(timerHandle);
             }
             break;
         case 1:
             if (BUTTON == 0 && TI_GetTics(timerHandle) >= REBOUNDS) {
                 isPressed = 1;
-                state = 2;
+                state++;
                 TI_ResetTics(timerHandle);
             }
             break;

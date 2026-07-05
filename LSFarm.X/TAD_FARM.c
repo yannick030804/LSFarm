@@ -24,7 +24,6 @@
 #define PRODUCT_COUNT(species) productCounts[(species)]
 #define LAST_GENERATION(species) lastGeneration[(species)]
 #define LAST_PRODUCT(species) lastProduct[(species)]
-#define PRODUCT_TIME(species) productTimes[(species)]
 #define ANIMAL_SPECIES(index) ((unsigned char)(animalInfo[(index)] & ANIMAL_SPECIES_MASK))
 #define ANIMAL_IS_CRITICAL(index) ((unsigned char)((animalInfo[(index)] & ANIMAL_CRITICAL_MASK) != 0))
 
@@ -85,15 +84,14 @@ static void Farm_ProcessProducts (unsigned char species, unsigned char now);
 static void Farm_ProcessCriticalAnimal (unsigned char index);
 static void Farm_ResetSelectionState (void);
 static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second);
+static unsigned char Farm_GetNowSeconds (void);
 static unsigned long Farm_GetCurrentDateStamp (void);
 static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index);
 static void Farm_StoreSleepDate (unsigned char index);
 static void Farm_SetAnimalSpecies (unsigned char index, unsigned char species);
 static void Farm_SetAnimalCritical (unsigned char index, unsigned char critical);
-static void Farm_ClearAnimals (void);
 static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes);
-static const unsigned char productTimes[FARM_NUM_SPECIES] = {47, 31, 23, 13};
-static const unsigned int monthOffsets[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+static unsigned char Farm_GetProductTime (unsigned char species);
 
 void Farm_Init (void) {
     TI_NewTimer(&timerHandle);
@@ -123,7 +121,7 @@ void motorFarm (void) {
         case 0:
             if (configRequested == 1) {
                 copyIndex = 0;
-                state = 1;
+                state++;
             }
             break;
 
@@ -133,7 +131,7 @@ void motorFarm (void) {
                 copyIndex++;
             } else {
                 farmName[copyIndex] = '\0';
-                state = 2;
+                state++;
             }
             break;
 
@@ -147,7 +145,7 @@ void motorFarm (void) {
             configRequested = 0;
             Farm_MarkDirty();
             TI_ResetTics(timerHandle);
-            state = 3;
+            state++;
             break;
 
         case 3:
@@ -155,28 +153,28 @@ void motorFarm (void) {
                 break;
             }
             speciesIndex = 0;
-            state = 4;
+            state++;
             break;
 
         case 4:
-            now = (unsigned char)(TI_GetTics(timerHandle) / 1000UL);
+            now = Farm_GetNowSeconds();
             if (speciesIndex < FARM_NUM_SPECIES) {
                 Farm_ProcessGeneration(speciesIndex, now);
                 speciesIndex++;
             } else {
                 speciesIndex = 0;
-                state = 5;
+                state++;
             }
             break;
 
         case 5:
-            now = (unsigned char)(TI_GetTics(timerHandle) / 1000UL);
+            now = Farm_GetNowSeconds();
             if (speciesIndex < FARM_NUM_SPECIES) {
                 Farm_ProcessProducts(speciesIndex, now);
                 speciesIndex++;
             } else {
                 animalIndex = 0;
-                state = 6;
+                state++;
             }
             break;
 
@@ -190,7 +188,7 @@ void motorFarm (void) {
                 searchFinished = 0;
                 searchFound = 0;
                 selectedAnimalIndex = -1;
-                state = 7;
+                state++;
             } else {
                 state = 3;
             }
@@ -513,7 +511,7 @@ void Farm_EndImportState (void) {
     }
 
     farmName[FARM_MAX_NAME] = '\0';
-    for (i = 0; i < FARM_MAX_ANIMALS; i++) {
+    for (i = 0; i < totalAnimals; i++) {
         if (ANIMAL_SPECIES(i) >= FARM_NUM_SPECIES) {
             Farm_SetAnimalSpecies(i, SPECIES_COW);
         }
@@ -534,8 +532,6 @@ void Farm_ClearDirty (void) {
 }
 
 static void resetFarmData (void) {
-    unsigned char i;
-
     configured = 0;
     rebellion = 0;
     resetRequested = 0;
@@ -554,16 +550,14 @@ static void resetFarmData (void) {
     notificationCount = 0;
     Farm_ResetSelectionState();
 
-    for (i = 0; i < FARM_NUM_SPECIES; i++) {
-        PENDING_TIME(i) = 0;
-    }
+    PENDING_TIME(SPECIES_COW) = 0;
+    PENDING_TIME(SPECIES_PIG) = 0;
+    PENDING_TIME(SPECIES_HORSE) = 0;
+    PENDING_TIME(SPECIES_CHICKEN) = 0;
     Farm_ClearSpeciesData(1);
-    Farm_ClearAnimals();
 }
 
 static void Farm_ClearCurrentData (void) {
-    unsigned char i;
-
     totalAnimals = 0;
     notificationHead = 0;
     notificationCount = 0;
@@ -571,7 +565,6 @@ static void Farm_ClearCurrentData (void) {
     dirtyState = 0;
     Farm_ResetSelectionState();
     Farm_ClearSpeciesData(0);
-    Farm_ClearAnimals();
 }
 
 static void Farm_RecountAnimals (void) {
@@ -673,7 +666,7 @@ static void Farm_ProcessProducts (unsigned char species, unsigned char now) {
         return;
     }
 
-    if ((unsigned char)(now - LAST_PRODUCT(species)) < PRODUCT_TIME(species)) {
+    if ((unsigned char)(now - LAST_PRODUCT(species)) < Farm_GetProductTime(species)) {
         return;
     }
 
@@ -701,7 +694,7 @@ static void Farm_ProcessCriticalAnimal (unsigned char index) {
         return;
     }
 
-    if (Farm_GetSleepElapsedSeconds(index) < (CRITICAL_TIME / 1000UL)) {
+    if (Farm_GetSleepElapsedSeconds(index) < 120UL) {
         return;
     }
 
@@ -724,6 +717,10 @@ static void Farm_ResetSelectionState (void) {
 }
 
 static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second) {
+    unsigned int monthOffset = 0;
+    unsigned int dayOffset;
+    unsigned long total = second;
+
     if (month == 0) {
         month = 1;
     }
@@ -734,7 +731,47 @@ static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char mon
         month = 12;
     }
 
-    return (((((unsigned long)monthOffsets[month - 1] + (unsigned long)(day - 1)) * 24UL) + hour) * 60UL + minute) * 60UL + second;
+    if (month > 1) monthOffset += 31;
+    if (month > 2) monthOffset += 28;
+    if (month > 3) monthOffset += 31;
+    if (month > 4) monthOffset += 30;
+    if (month > 5) monthOffset += 31;
+    if (month > 6) monthOffset += 30;
+    if (month > 7) monthOffset += 31;
+    if (month > 8) monthOffset += 31;
+    if (month > 9) monthOffset += 30;
+    if (month > 10) monthOffset += 31;
+    if (month > 11) monthOffset += 30;
+
+    while (minute > 0) {
+        total += 60UL;
+        minute--;
+    }
+
+    while (hour > 0) {
+        total += 3600UL;
+        hour--;
+    }
+
+    dayOffset = (unsigned int)(monthOffset + (unsigned int)(day - 1));
+    while (dayOffset > 0) {
+        total += 86400UL;
+        dayOffset--;
+    }
+
+    return total;
+}
+
+static unsigned char Farm_GetNowSeconds (void) {
+    unsigned long tics = TI_GetTics(timerHandle);
+    unsigned char seconds = 0;
+
+    while (tics >= 1000UL) {
+        tics -= 1000UL;
+        seconds++;
+    }
+
+    return seconds;
 }
 
 static unsigned long Farm_GetCurrentDateStamp (void) {
@@ -771,15 +808,6 @@ static void Farm_SetAnimalCritical (unsigned char index, unsigned char critical)
     }
 }
 
-static void Farm_ClearAnimals (void) {
-    unsigned char i;
-
-    for (i = 0; i < FARM_MAX_ANIMALS; i++) {
-        animalInfo[i] = 0;
-        animalSleepStamp[i] = 0;
-    }
-}
-
 static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes) {
     unsigned char i;
 
@@ -793,4 +821,17 @@ static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes) {
             GENERATION_TIME(i) = 0;
         }
     }
+}
+
+static unsigned char Farm_GetProductTime (unsigned char species) {
+    if (species == SPECIES_COW) {
+        return 47;
+    }
+    if (species == SPECIES_PIG) {
+        return 31;
+    }
+    if (species == SPECIES_HORSE) {
+        return 23;
+    }
+    return 13;
 }

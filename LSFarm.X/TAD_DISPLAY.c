@@ -36,15 +36,28 @@ static void Display_ShowText (const char *line1, const char *line2) {
 
 static void Display_PutNumber (unsigned char value) {
     unsigned char index = 0;
+    unsigned char digit = 0;
 
     if (value >= 100) {
-        displayLine[index++] = (char)('0' + (value / 100));
-        value = (unsigned char)(value % 100);
-        displayLine[index++] = (char)('0' + (value / 10));
+        while (value >= 100) {
+            value = (unsigned char)(value - 100);
+            digit++;
+        }
+        displayLine[index++] = (char)('0' + digit);
+        digit = 0;
+        while (value >= 10) {
+            value = (unsigned char)(value - 10);
+            digit++;
+        }
+        displayLine[index++] = (char)('0' + digit);
     } else if (value >= 10) {
-        displayLine[index++] = (char)('0' + (value / 10));
+        while (value >= 10) {
+            value = (unsigned char)(value - 10);
+            digit++;
+        }
+        displayLine[index++] = (char)('0' + digit);
     }
-    displayLine[index++] = (char)('0' + (value % 10));
+    displayLine[index++] = (char)('0' + value);
     displayLine[index] = '\0';
 }
 
@@ -63,6 +76,7 @@ static void Display_ShowNotification (const FarmNotification *notification) {
 
 static void Display_ShowIdleScreen (void) {
     unsigned char day;
+    unsigned char digit;
     unsigned char month;
 
     if (Farm_IsConfigured() == 0) {
@@ -77,11 +91,21 @@ static void Display_ShowIdleScreen (void) {
 
     day = SerialTime_GetDay();
     month = SerialTime_GetMonth();
-    displayLine[0] = (char)('0' + (day / 10));
-    displayLine[1] = (char)('0' + (day % 10));
+    digit = 0;
+    while (day >= 10) {
+        day = (unsigned char)(day - 10);
+        digit++;
+    }
+    displayLine[0] = (char)('0' + digit);
+    displayLine[1] = (char)('0' + day);
     displayLine[2] = '/';
-    displayLine[3] = (char)('0' + (month / 10));
-    displayLine[4] = (char)('0' + (month % 10));
+    digit = 0;
+    while (month >= 10) {
+        month = (unsigned char)(month - 10);
+        digit++;
+    }
+    displayLine[3] = (char)('0' + digit);
+    displayLine[4] = (char)('0' + month);
     displayLine[5] = '\0';
     Display_ShowText(Farm_GetName(), displayLine);
 }
@@ -99,14 +123,14 @@ void motorDisplay (void) {
             if (Farm_GetNotification(&notification) == 1) {
                 Display_ShowNotification(&notification);
                 TI_ResetTics(DISPLAY_TIMER_HANDLE());
-                DISPLAY_SET_STATE(1);
+                DISPLAY_SET_STATE(DISPLAY_GET_STATE() + 1);
             } else {
                 Display_ShowIdleScreen();
             }
             break;
         case 1:
             if (TI_GetTics(DISPLAY_TIMER_HANDLE()) >= DISPLAY_MESSAGE_TIME) {
-                DISPLAY_SET_STATE(0);
+                DISPLAY_SET_STATE(DISPLAY_GET_STATE() - 1);
             }
             break;
     }

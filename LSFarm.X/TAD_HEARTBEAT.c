@@ -35,21 +35,21 @@ void motorHeartbeat (void) {
             if (TI_GetTics(timerHandle) >= 700) {
                 TI_ResetTics(timerHandle);
                 HEARTBEAT = 1;
-                state = 1;
+                state++;
             }
             break;
         case 1:
             if (TI_GetTics(timerHandle) >= 70) {
                 TI_ResetTics(timerHandle);
                 HEARTBEAT = 0;
-                state = 2;
+                state++;
             }
             break;
         case 2:
             if (TI_GetTics(timerHandle) >= 120) {
                 TI_ResetTics(timerHandle);
                 HEARTBEAT = 1;
-                state = 3;
+                state++;
             }
             break;
         case 3:

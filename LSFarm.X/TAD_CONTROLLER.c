@@ -50,21 +50,29 @@ static unsigned char isValidGenerationTime (unsigned char value) {
 }
 
 static unsigned char appendNum (unsigned char index, unsigned char value) {
-    unsigned char d;
-    unsigned char started = 0;
+    unsigned char digit = 0;
 
-    d = (unsigned char)(value / 100);
-    if (d != 0) {
-        txBuffer[index++] = (char)('0' + d);
-        started = 1;
+    if (value >= 100) {
+        while (value >= 100) {
+            value = (unsigned char)(value - 100);
+            digit++;
+        }
+        txBuffer[index++] = (char)('0' + digit);
+        digit = 0;
+        while (value >= 10) {
+            value = (unsigned char)(value - 10);
+            digit++;
+        }
+        txBuffer[index++] = (char)('0' + digit);
+    } else if (value >= 10) {
+        while (value >= 10) {
+            value = (unsigned char)(value - 10);
+            digit++;
+        }
+        txBuffer[index++] = (char)('0' + digit);
     }
 
-    d = (unsigned char)((value / 10) % 10);
-    if (d != 0 || started == 1) {
-        txBuffer[index++] = (char)('0' + d);
-    }
-
-    txBuffer[index++] = (char)('0' + (value % 10));
+    txBuffer[index++] = (char)('0' + value);
     return index;
 }
 
@@ -73,7 +81,7 @@ static unsigned char parseNumber (const char *text, unsigned char *index, unsign
     unsigned char hasDigits = 0;
 
     while (isDigit(text[*index])) {
-        number = (unsigned char)(number * 10 + (text[*index] - '0'));
+        number = (unsigned char)((number << 3) + (number << 1) + (text[*index] - '0'));
         (*index)++;
         hasDigits = 1;
     }

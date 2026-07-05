@@ -22,7 +22,7 @@ void motorLDR (void) {
         case 0:
             if (Farm_IsRestRequestPending() == 1) {
                 TI_ResetTics(timerHandle);
-                state = 1;
+                state++;
             }
             break;
         case 1:
@@ -31,7 +31,7 @@ void motorLDR (void) {
                 break;
             }
             if (ADC_Start(LDR_ADC_CHANNEL) == 1) {
-                state = 2;
+                state++;
             }
             break;
         case 2:
