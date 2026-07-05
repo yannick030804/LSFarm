@@ -7,9 +7,6 @@
 
 void SerialJava_Init (void);
 unsigned char SJ_PutString( const char *str);
-char *SJ_GetLine (void);
-
-extern char serialJavaBuffer[];
-extern unsigned char serialJavaLineIndex;
+const char *SJ_GetLine (void);
 
 #endif

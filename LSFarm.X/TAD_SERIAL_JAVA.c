@@ -2,8 +2,8 @@
 #include "TAD_SERIAL_JAVA.h"
 
 static unsigned char stringIndex;
-char serialJavaBuffer[24];
-unsigned char serialJavaLineIndex;
+static char line[24];
+static unsigned char lineIndex;
 
 void SerialJava_Init (void) {
     CONFIG_SERIAL_JAVA;
@@ -28,7 +28,7 @@ unsigned char SJ_PutString (const char *str) {
     return 0;
 }
 
-char *SJ_GetLine(void) {
+const char *SJ_GetLine(void) {
     unsigned char c;
 
     if (!PIR1bits.RCIF) {
@@ -38,18 +38,18 @@ char *SJ_GetLine(void) {
     c = RCREG;
 
     if (c == '\r' || c == '\n') {
-        if (serialJavaLineIndex == 0) {
+        if (lineIndex == 0) {
             return 0;
         }
 
-        serialJavaBuffer[serialJavaLineIndex] = '\0';
-        serialJavaLineIndex = 0;
-        return serialJavaBuffer;
+        line[lineIndex] = '\0';
+        lineIndex = 0;
+        return line;
     }
 
-    if (serialJavaLineIndex < sizeof(serialJavaBuffer) - 1) {
-        serialJavaBuffer[serialJavaLineIndex] = c;
-        serialJavaLineIndex++;
+    if (lineIndex < sizeof(line) - 1) {
+        line[lineIndex] = c;
+        lineIndex++;
     }
 
     return 0;

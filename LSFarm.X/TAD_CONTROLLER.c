@@ -29,9 +29,9 @@
 #define REPLY_LEFT          13
 #define REPLY_RIGHT         14
 
-#define txBuffer serialJavaBuffer
-
 static const char *txLine;
+static char controllerFarmName[17];
+static char txBuffer[21];
 static unsigned char controllerFlags;
 static unsigned char persistenceIndex;
 
@@ -81,31 +81,28 @@ static void Controller_SetReply (unsigned char reply) {
 
     switch (reply) {
         case REPLY_INIT_OK:
-            txBuffer[index++] = 'I';
-            txBuffer[index++] = 'N';
-            txBuffer[index++] = 'I';
-            txBuffer[index++] = 'T';
-            goto appendOk;
         case REPLY_INIT_ERROR:
             txBuffer[index++] = 'I';
             txBuffer[index++] = 'N';
             txBuffer[index++] = 'I';
             txBuffer[index++] = 'T';
+            if (reply == REPLY_INIT_OK) {
+                goto appendOk;
+            }
             goto appendError;
+
         case REPLY_SLEEP_OK:
-            txBuffer[index++] = 'S';
-            txBuffer[index++] = 'L';
-            txBuffer[index++] = 'E';
-            txBuffer[index++] = 'E';
-            txBuffer[index++] = 'P';
-            goto appendOk;
         case REPLY_SLEEP_ERROR:
             txBuffer[index++] = 'S';
             txBuffer[index++] = 'L';
             txBuffer[index++] = 'E';
             txBuffer[index++] = 'E';
             txBuffer[index++] = 'P';
+            if (reply == REPLY_SLEEP_OK) {
+                goto appendOk;
+            }
             goto appendError;
+
         case REPLY_RESET_OK:
             txBuffer[index++] = 'R';
             txBuffer[index++] = 'E';
@@ -113,17 +110,8 @@ static void Controller_SetReply (unsigned char reply) {
             txBuffer[index++] = 'E';
             txBuffer[index++] = 'T';
             goto appendOk;
+
         case REPLY_REBELLION_ON:
-            txBuffer[index++] = 'R';
-            txBuffer[index++] = 'E';
-            txBuffer[index++] = 'B';
-            txBuffer[index++] = 'E';
-            txBuffer[index++] = 'L';
-            txBuffer[index++] = 'L';
-            txBuffer[index++] = 'I';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'N';
-            goto appendOn;
         case REPLY_REBELLION_OFF:
             txBuffer[index++] = 'R';
             txBuffer[index++] = 'E';
@@ -134,16 +122,12 @@ static void Controller_SetReply (unsigned char reply) {
             txBuffer[index++] = 'I';
             txBuffer[index++] = 'O';
             txBuffer[index++] = 'N';
+            if (reply == REPLY_REBELLION_ON) {
+                goto appendOn;
+            }
             goto appendOff;
+
         case REPLY_CONSUME_OK:
-            txBuffer[index++] = 'C';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'N';
-            txBuffer[index++] = 'S';
-            txBuffer[index++] = 'U';
-            txBuffer[index++] = 'M';
-            txBuffer[index++] = 'E';
-            goto appendOk;
         case REPLY_CONSUME_ERROR:
             txBuffer[index++] = 'C';
             txBuffer[index++] = 'O';
@@ -152,7 +136,11 @@ static void Controller_SetReply (unsigned char reply) {
             txBuffer[index++] = 'U';
             txBuffer[index++] = 'M';
             txBuffer[index++] = 'E';
+            if (reply == REPLY_CONSUME_OK) {
+                goto appendOk;
+            }
             goto appendError;
+
         case REPLY_BUTTON:
             txBuffer[index++] = 'S';
             break;
@@ -227,23 +215,26 @@ static unsigned char parseNumber (const char *text, unsigned char *index, unsign
     return 1;
 }
 
-static unsigned char parseInitCommand (char *text) {
+static unsigned char parseInitCommand (const char *text) {
     unsigned char i = 2;
-    unsigned char nameEnd;
+    unsigned char nameIndex = 0;
     unsigned char cow;
     unsigned char horse;
     unsigned char pig;
     unsigned char chicken;
 
     while (text[i] != '$' && text[i] != '\0') {
+        if (nameIndex < sizeof(controllerFarmName) - 1) {
+            controllerFarmName[nameIndex++] = text[i];
+        }
         i++;
     }
 
-    if (i == 2 || text[i] != '$') {
+    if (nameIndex == 0 || text[i] != '$') {
         return 0;
     }
 
-    nameEnd = i;
+    controllerFarmName[nameIndex] = '\0';
     i++;
 
     if (parseNumber(text, &i, &cow, '$') == 0) {
@@ -267,8 +258,7 @@ static unsigned char parseInitCommand (char *text) {
         return 0;
     }
 
-    text[nameEnd] = '\0';
-    Farm_RequestConfigure(&text[2], cow, horse, pig, chicken);
+    Farm_RequestConfigure(controllerFarmName, cow, horse, pig, chicken);
     return 1;
 }
 
@@ -448,10 +438,10 @@ static void buildAnimalLine (unsigned char indexAnimal) {
     txBuffer[index] = '\0';
 }
 
-static unsigned char Controller_ProcessLine (char *line, unsigned char *animalIndex) {
+static unsigned char Controller_ProcessLine (const char *line, unsigned char *animalIndex) {
     unsigned char recipeId;
 
-    txLine = 0;
+    Controller_SetReply(REPLY_INIT_ERROR);
 
     switch (line[0]) {
         case 'I':
@@ -500,7 +490,7 @@ static unsigned char Controller_ProcessLine (char *line, unsigned char *animalIn
             }
             break;
         case 'C':
-            if (line[1] == ':' && isDigit(line[2]) && line[3] == '\0') {
+            if (line[1] == ':' && line[3] == '\0') {
                 recipeId = (unsigned char)(line[2] - '0');
                 if (recipeId <= 3) {
                     Farm_Consume(recipeId);
@@ -510,10 +500,6 @@ static unsigned char Controller_ProcessLine (char *line, unsigned char *animalIn
                 }
             }
             break;
-    }
-
-    if (txLine == 0) {
-        Controller_SetReply(REPLY_INIT_ERROR);
     }
 
     return 5;
@@ -528,19 +514,9 @@ static unsigned char Controller_ProcessInputs (void) {
     }
 
     recipeId = Joystick_GetEvent();
-    switch (recipeId) {
-        case JOY_EVT_UP:
-            Controller_SetReply(REPLY_UP);
-            return 5;
-        case JOY_EVT_DOWN:
-            Controller_SetReply(REPLY_DOWN);
-            return 5;
-        case JOY_EVT_LEFT:
-            Controller_SetReply(REPLY_LEFT);
-            return 5;
-        case JOY_EVT_RIGHT:
-            Controller_SetReply(REPLY_RIGHT);
-            return 5;
+    if (recipeId != JOY_EVT_NONE) {
+        Controller_SetReply((unsigned char)(REPLY_FINISH_ANIMALS + recipeId));
+        return 5;
     }
 
     return 0;
@@ -549,7 +525,7 @@ static unsigned char Controller_ProcessInputs (void) {
 void motorController (void) {
     static unsigned char state = 0;
     static unsigned char animalIndex = 0;
-    char *line;
+    const char *line;
 
     switch (state) {
         case 0:
@@ -557,7 +533,7 @@ void motorController (void) {
             line = SJ_GetLine();
             if (line != 0) {
                 state = Controller_ProcessLine(line, &animalIndex);
-            } else if (serialJavaLineIndex == 0) {
+            } else {
                 state = Controller_ProcessInputs();
             }
             break;

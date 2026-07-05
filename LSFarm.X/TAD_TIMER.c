@@ -14,10 +14,10 @@
 
 #define TI_NUMTIMERS 7
 
-static unsigned int TimerStarts[TI_NUMTIMERS];
+static unsigned long TimerStarts[TI_NUMTIMERS];
 static unsigned char TimerBusyMask;
 
-static volatile unsigned int Tics = 0;
+static volatile unsigned long Tics = 0;
 
 void RSI_Timer0 () {
     TMR0 = RECARREGA_TMR0;
@@ -51,9 +51,9 @@ void TI_ResetTics (unsigned char TimerHandle) {
     ei();
 }
 
-unsigned int TI_GetTics (unsigned char TimerHandle) {
+unsigned long TI_GetTics (unsigned char TimerHandle) {
     di();
-    unsigned int CopiaTicsActual = Tics;
+    unsigned long CopiaTicsActual = Tics;
     ei();
-    return (unsigned int)(CopiaTicsActual - TimerStarts[TimerHandle]);
+    return (CopiaTicsActual - TimerStarts[TimerHandle]);
 }

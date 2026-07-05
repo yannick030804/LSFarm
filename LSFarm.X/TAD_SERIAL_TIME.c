@@ -3,6 +3,7 @@
 #include "TAD_TIMER.h"
 
 #define SERIAL_TIME_LINE_MAX 14
+#define SERIAL_TIME_INVALID 255
 #define ST_FLAG_RX_READY 0x01
 #define ST_FLAG_RX_ACTIVE 0x02
 #define ST_FLAG_TX_ACTIVE 0x04
@@ -39,7 +40,13 @@ static unsigned char isDigit (char c) {
 }
 
 static unsigned char parseTwoDigits (unsigned char index) {
-    unsigned char value = (unsigned char)(rxChars[index] - '0');
+    unsigned char value;
+
+    if (isDigit(rxChars[index]) == 0 || isDigit(rxChars[index + 1]) == 0) {
+        return SERIAL_TIME_INVALID;
+    }
+
+    value = (unsigned char)(rxChars[index] - '0');
     return (unsigned char)((unsigned char)((value << 3) + (value << 1)) + (unsigned char)(rxChars[index + 1] - '0'));
 }
 
@@ -58,19 +65,17 @@ static unsigned char SerialTime_ParseLine (void) {
         return 0;
     }
 
-    if (isDigit(rxChars[0]) == 0 || isDigit(rxChars[1]) == 0 ||
-        isDigit(rxChars[3]) == 0 || isDigit(rxChars[4]) == 0 ||
-        isDigit(rxChars[6]) == 0 || isDigit(rxChars[7]) == 0 ||
-        isDigit(rxChars[9]) == 0 || isDigit(rxChars[10]) == 0 ||
-        isDigit(rxChars[12]) == 0 || isDigit(rxChars[13]) == 0) {
-        return 0;
-    }
-
     day = parseTwoDigits(0);
     month = parseTwoDigits(3);
     hour = parseTwoDigits(6);
     minute = parseTwoDigits(9);
     second = parseTwoDigits(12);
+
+    if (day == SERIAL_TIME_INVALID || month == SERIAL_TIME_INVALID ||
+        hour == SERIAL_TIME_INVALID || minute == SERIAL_TIME_INVALID ||
+        second == SERIAL_TIME_INVALID) {
+        return 0;
+    }
 
     if (day < 1 || day > 31 || month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) {
         return 0;

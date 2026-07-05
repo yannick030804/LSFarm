@@ -133,7 +133,7 @@ void motorFarm (void) {
             if (configured == 0) {
                 break;
             }
-            if (TI_GetTics(timerHandle) >= 1000) {
+            if (TI_GetTics(timerHandle) >= 1000UL) {
                 TI_ResetTics(timerHandle);
                 now++;
             }
