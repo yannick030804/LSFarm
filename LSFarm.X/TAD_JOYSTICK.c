@@ -13,31 +13,6 @@ static unsigned char adcX;
 static unsigned char adcY;
 static unsigned char joyPacked;
 
-static void processJoystick (void) {
-    unsigned char newDirection = JOY_EVT_NONE;
-
-    if (JOY_GET_PENDING() != JOY_EVT_NONE) {
-        return;
-    }
-
-    if (adcX > 170) {
-        newDirection = JOY_EVT_RIGHT;
-    } else if (adcX < 86) {
-        newDirection = JOY_EVT_LEFT;
-    } else if (adcY > 170) {
-        newDirection = JOY_EVT_DOWN;
-    } else if (adcY < 86) {
-        newDirection = JOY_EVT_UP;
-    }
-
-    if (newDirection != JOY_GET_LAST()) {
-        JOY_SET_LAST(newDirection);
-        if (newDirection != JOY_EVT_NONE) {
-            JOY_SET_PENDING(newDirection);
-        }
-    }
-}
-
 void Joystick_Init(void) {
     CONFIG_JOYSTICK;
 }
@@ -69,7 +44,26 @@ void motorJoystick (void) {
             }
             break;
         case 4:
-            processJoystick();
+            if (JOY_GET_PENDING() == JOY_EVT_NONE) {
+                unsigned char newDirection = JOY_EVT_NONE;
+
+                if (adcX > 170) {
+                    newDirection = JOY_EVT_RIGHT;
+                } else if (adcX < 86) {
+                    newDirection = JOY_EVT_LEFT;
+                } else if (adcY > 170) {
+                    newDirection = JOY_EVT_DOWN;
+                } else if (adcY < 86) {
+                    newDirection = JOY_EVT_UP;
+                }
+
+                if (newDirection != JOY_GET_LAST()) {
+                    JOY_SET_LAST(newDirection);
+                    if (newDirection != JOY_EVT_NONE) {
+                        JOY_SET_PENDING(newDirection);
+                    }
+                }
+            }
             state = 0;
             break;
     }

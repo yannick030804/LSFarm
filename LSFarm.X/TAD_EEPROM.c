@@ -65,10 +65,7 @@ unsigned char EEPROM_StartByteWrite (unsigned char addr, unsigned char data) {
 }
 
 unsigned char EEPROM_IsBusy (void) {
-    if (mode != 0) {
-        return 1;
-    }
-    return 0;
+    return (unsigned char)(mode != 0);
 }
 
 void EEPROM_RequestClear (void) {

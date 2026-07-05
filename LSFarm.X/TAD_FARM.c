@@ -89,6 +89,8 @@ static void Farm_StoreSleepDate (unsigned char index);
 static void Farm_SetAnimalSpecies (unsigned char index, unsigned char species);
 static void Farm_SetAnimalCritical (unsigned char index, unsigned char critical);
 static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes);
+static unsigned char Farm_ExportAnimalByte (unsigned char index);
+static void Farm_ImportAnimalByte (unsigned char index, unsigned char value);
 
 void Farm_Init (void) {
     TI_NewTimer(&timerHandle);
@@ -376,9 +378,6 @@ void Farm_SetCurrentDate (unsigned char valid, unsigned char day, unsigned char 
 }
 
 unsigned char Farm_ExportByte (unsigned char index) {
-    unsigned char animalIndex;
-    unsigned char byteIndex;
-
     if (index < (FARM_MAX_NAME + 1)) {
         return (unsigned char)farmName[index];
     }
@@ -399,30 +398,7 @@ unsigned char Farm_ExportByte (unsigned char index) {
     }
 
     index = (unsigned char)(index - FARM_NUM_SPECIES);
-    animalIndex = 0;
-    while (index >= 5) {
-        index = (unsigned char)(index - 5);
-        animalIndex++;
-    }
-    byteIndex = index;
-
-    if (animalIndex >= FARM_MAX_ANIMALS || animalIndex >= totalAnimals) {
-        return 0;
-    }
-
-    if (byteIndex == 0) {
-        return animalInfo[animalIndex];
-    }
-    if (byteIndex == 1) {
-        return (unsigned char)animalSleepStamp[animalIndex];
-    }
-    if (byteIndex == 2) {
-        return (unsigned char)(animalSleepStamp[animalIndex] >> 8);
-    }
-    if (byteIndex == 3) {
-        return (unsigned char)(animalSleepStamp[animalIndex] >> 16);
-    }
-    return (unsigned char)(animalSleepStamp[animalIndex] >> 24);
+    return Farm_ExportAnimalByte(index);
 }
 
 void Farm_BeginImportState (void) {
@@ -430,9 +406,6 @@ void Farm_BeginImportState (void) {
 }
 
 void Farm_ImportStateByte (unsigned char index, unsigned char value) {
-    unsigned char animalIndex;
-    unsigned char byteIndex;
-
     if (index < (FARM_MAX_NAME + 1)) {
         farmName[index] = (char)value;
         return;
@@ -457,34 +430,7 @@ void Farm_ImportStateByte (unsigned char index, unsigned char value) {
     }
 
     index = (unsigned char)(index - FARM_NUM_SPECIES);
-    animalIndex = 0;
-    while (index >= 5) {
-        index = (unsigned char)(index - 5);
-        animalIndex++;
-    }
-    byteIndex = index;
-
-    if (animalIndex >= FARM_MAX_ANIMALS) {
-        return;
-    }
-
-    if (byteIndex == 0) {
-        animalInfo[animalIndex] = value;
-        return;
-    }
-    if (byteIndex == 1) {
-        animalSleepStamp[animalIndex] &= 0xFFFFFF00UL;
-        animalSleepStamp[animalIndex] |= (unsigned long)value;
-    } else if (byteIndex == 2) {
-        animalSleepStamp[animalIndex] &= 0xFFFF00FFUL;
-        animalSleepStamp[animalIndex] |= ((unsigned long)value << 8);
-    } else if (byteIndex == 3) {
-        animalSleepStamp[animalIndex] &= 0xFF00FFFFUL;
-        animalSleepStamp[animalIndex] |= ((unsigned long)value << 16);
-    } else {
-        animalSleepStamp[animalIndex] &= 0x00FFFFFFUL;
-        animalSleepStamp[animalIndex] |= ((unsigned long)value << 24);
-    }
+    Farm_ImportAnimalByte(index, value);
 }
 
 void Farm_EndImportState (void) {
@@ -809,5 +755,63 @@ static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes) {
         if (clearGenerationTimes == 1) {
             GENERATION_TIME(i) = 0;
         }
+    }
+}
+
+static unsigned char Farm_ExportAnimalByte (unsigned char index) {
+    unsigned char animalIndex = 0;
+
+    while (index >= 5) {
+        index = (unsigned char)(index - 5);
+        animalIndex++;
+    }
+
+    if (animalIndex >= FARM_MAX_ANIMALS || animalIndex >= totalAnimals) {
+        return 0;
+    }
+
+    if (index == 0) {
+        return animalInfo[animalIndex];
+    }
+    if (index == 1) {
+        return (unsigned char)animalSleepStamp[animalIndex];
+    }
+    if (index == 2) {
+        return (unsigned char)(animalSleepStamp[animalIndex] >> 8);
+    }
+    if (index == 3) {
+        return (unsigned char)(animalSleepStamp[animalIndex] >> 16);
+    }
+    return (unsigned char)(animalSleepStamp[animalIndex] >> 24);
+}
+
+static void Farm_ImportAnimalByte (unsigned char index, unsigned char value) {
+    unsigned char animalIndex = 0;
+
+    while (index >= 5) {
+        index = (unsigned char)(index - 5);
+        animalIndex++;
+    }
+
+    if (animalIndex >= FARM_MAX_ANIMALS) {
+        return;
+    }
+
+    if (index == 0) {
+        animalInfo[animalIndex] = value;
+        return;
+    }
+    if (index == 1) {
+        animalSleepStamp[animalIndex] &= 0xFFFFFF00UL;
+        animalSleepStamp[animalIndex] |= (unsigned long)value;
+    } else if (index == 2) {
+        animalSleepStamp[animalIndex] &= 0xFFFF00FFUL;
+        animalSleepStamp[animalIndex] |= ((unsigned long)value << 8);
+    } else if (index == 3) {
+        animalSleepStamp[animalIndex] &= 0xFF00FFFFUL;
+        animalSleepStamp[animalIndex] |= ((unsigned long)value << 16);
+    } else {
+        animalSleepStamp[animalIndex] &= 0x00FFFFFFUL;
+        animalSleepStamp[animalIndex] |= ((unsigned long)value << 24);
     }
 }

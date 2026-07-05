@@ -450,6 +450,100 @@ static void buildAnimalLine (unsigned char indexAnimal) {
     txBuffer[index] = '\0';
 }
 
+static unsigned char Controller_ProcessLine (const char *line, unsigned char *animalIndex) {
+    unsigned char recipeId;
+
+    Controller_SetReply(REPLY_INIT_ERROR);
+
+    switch (line[0]) {
+        case 'I':
+            if (line[1] == ':' && parseInitCommand(line) == 1) {
+                return 1;
+            }
+            break;
+        case 'S':
+            if (line[1] == ':' && parseSleepCommand(line) == 1) {
+                return 2;
+            }
+            Controller_SetReply(REPLY_SLEEP_ERROR);
+            break;
+        case 'G':
+            if (line[1] == '\0') {
+                buildProductsLine();
+                txLine = txBuffer;
+            }
+            break;
+        case 'A':
+            if (line[1] == '\0') {
+                *animalIndex = 0;
+                return 4;
+            }
+            break;
+        case 'R':
+            if (line[1] == '\0') {
+                Farm_Reset();
+                Heartbeat_SetRebellion(0);
+                controllerFlags |= CTRL_FLAG_RESET_PENDING;
+                Controller_SetReply(REPLY_RESET_OK);
+            }
+            break;
+        case 'B':
+            if (line[1] == '\0') {
+                Farm_SetRebellion(1);
+                Heartbeat_SetRebellion(1);
+                Controller_SetReply(REPLY_REBELLION_ON);
+            }
+            break;
+        case 'P':
+            if (line[1] == '\0') {
+                Farm_SetRebellion(0);
+                Heartbeat_SetRebellion(0);
+                Controller_SetReply(REPLY_REBELLION_OFF);
+            }
+            break;
+        case 'C':
+            if (line[1] == ':' && isDigit(line[2]) && line[3] == '\0') {
+                recipeId = (unsigned char)(line[2] - '0');
+                if (recipeId <= 3) {
+                    Farm_Consume(recipeId);
+                    Controller_SetReply(REPLY_CONSUME_OK);
+                } else {
+                    Controller_SetReply(REPLY_CONSUME_ERROR);
+                }
+            }
+            break;
+    }
+
+    return 5;
+}
+
+static unsigned char Controller_ProcessInputs (void) {
+    unsigned char recipeId;
+
+    if (getButton() == 1) {
+        Controller_SetReply(REPLY_BUTTON);
+        return 5;
+    }
+
+    recipeId = Joystick_GetEvent();
+    switch (recipeId) {
+        case JOY_EVT_UP:
+            Controller_SetReply(REPLY_UP);
+            return 5;
+        case JOY_EVT_DOWN:
+            Controller_SetReply(REPLY_DOWN);
+            return 5;
+        case JOY_EVT_LEFT:
+            Controller_SetReply(REPLY_LEFT);
+            return 5;
+        case JOY_EVT_RIGHT:
+            Controller_SetReply(REPLY_RIGHT);
+            return 5;
+    }
+
+    return 0;
+}
+
 void Controller_Init (void) {
 }
 
@@ -457,97 +551,15 @@ void motorController (void) {
     static unsigned char state = 0;
     static unsigned char animalIndex = 0;
     const char *line;
-    unsigned char recipeId;
 
     switch (state) {
         case 0:
             Controller_ServiceFarm();
             line = SJ_GetLine();
             if (line != 0) {
-                Controller_SetReply(REPLY_INIT_ERROR);
-                state = 5;
-                switch (line[0]) {
-                    case 'I':
-                        if (line[1] == ':' && parseInitCommand(line) == 1) {
-                            state = 1;
-                        }
-                        break;
-                    case 'S':
-                        if (line[1] == ':' && parseSleepCommand(line) == 1) {
-                            state = 2;
-                        } else {
-                            Controller_SetReply(REPLY_SLEEP_ERROR);
-                        }
-                        break;
-                    case 'G':
-                        if (line[1] == '\0') {
-                            buildProductsLine();
-                            txLine = txBuffer;
-                        }
-                        break;
-                    case 'A':
-                        if (line[1] == '\0') {
-                            animalIndex = 0;
-                            state = 4;
-                        }
-                        break;
-                    case 'R':
-                        if (line[1] == '\0') {
-                            Farm_Reset();
-                            Heartbeat_SetRebellion(0);
-                            controllerFlags |= CTRL_FLAG_RESET_PENDING;
-                            Controller_SetReply(REPLY_RESET_OK);
-                        }
-                        break;
-                    case 'B':
-                        if (line[1] == '\0') {
-                            Farm_SetRebellion(1);
-                            Heartbeat_SetRebellion(1);
-                            Controller_SetReply(REPLY_REBELLION_ON);
-                        }
-                        break;
-                    case 'P':
-                        if (line[1] == '\0') {
-                            Farm_SetRebellion(0);
-                            Heartbeat_SetRebellion(0);
-                            Controller_SetReply(REPLY_REBELLION_OFF);
-                        }
-                        break;
-                    case 'C':
-                        if (line[1] == ':' && isDigit(line[2]) && line[3] == '\0') {
-                            recipeId = (unsigned char)(line[2] - '0');
-                            if (recipeId <= 3) {
-                                Farm_Consume(recipeId);
-                                Controller_SetReply(REPLY_CONSUME_OK);
-                            } else {
-                                Controller_SetReply(REPLY_CONSUME_ERROR);
-                            }
-                        }
-                        break;
-                }
-            } else if (getButton() == 1) {
-                Controller_SetReply(REPLY_BUTTON);
-                state = 5;
+                state = Controller_ProcessLine(line, &animalIndex);
             } else {
-                recipeId = Joystick_GetEvent();
-                switch (recipeId) {
-                    case JOY_EVT_UP:
-                        Controller_SetReply(REPLY_UP);
-                        state = 5;
-                        break;
-                    case JOY_EVT_DOWN:
-                        Controller_SetReply(REPLY_DOWN);
-                        state = 5;
-                        break;
-                    case JOY_EVT_LEFT:
-                        Controller_SetReply(REPLY_LEFT);
-                        state = 5;
-                        break;
-                    case JOY_EVT_RIGHT:
-                        Controller_SetReply(REPLY_RIGHT);
-                        state = 5;
-                        break;
-                }
+                state = Controller_ProcessInputs();
             }
             break;
 
