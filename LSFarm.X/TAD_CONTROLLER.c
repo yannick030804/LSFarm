@@ -69,7 +69,16 @@ static unsigned char appendNum (unsigned char index, unsigned char value) {
     return index;
 }
 
-static unsigned char Controller_SetReplyGroupA (unsigned char reply, unsigned char index) {
+static void Controller_EndReply (unsigned char index) {
+    txBuffer[index++] = '\r';
+    txBuffer[index++] = '\n';
+    txBuffer[index] = '\0';
+    txLine = txBuffer;
+}
+
+static void Controller_SetReply (unsigned char reply) {
+    unsigned char index = 0;
+
     switch (reply) {
         case REPLY_INIT_OK:
             txBuffer[index++] = 'I';
@@ -102,7 +111,7 @@ static unsigned char Controller_SetReplyGroupA (unsigned char reply, unsigned ch
             txBuffer[index++] = 'O';
             txBuffer[index++] = 'K';
             break;
-        default:
+        case REPLY_SLEEP_ERROR:
             txBuffer[index++] = 'S';
             txBuffer[index++] = 'L';
             txBuffer[index++] = 'E';
@@ -115,116 +124,90 @@ static unsigned char Controller_SetReplyGroupA (unsigned char reply, unsigned ch
             txBuffer[index++] = 'O';
             txBuffer[index++] = 'R';
             break;
-    }
-    return index;
-}
-
-static unsigned char Controller_SetReplyGroupB (unsigned char reply, unsigned char index) {
-    if (reply == REPLY_RESET_OK) {
-        txBuffer[index++] = 'R';
-        txBuffer[index++] = 'E';
-        txBuffer[index++] = 'S';
-        txBuffer[index++] = 'E';
-        txBuffer[index++] = 'T';
-        txBuffer[index++] = ' ';
-        txBuffer[index++] = 'O';
-        txBuffer[index++] = 'K';
-    } else if (reply == REPLY_REBELLION_ON) {
-        txBuffer[index++] = 'R';
-        txBuffer[index++] = 'E';
-        txBuffer[index++] = 'B';
-        txBuffer[index++] = 'E';
-        txBuffer[index++] = 'L';
-        txBuffer[index++] = 'L';
-        txBuffer[index++] = 'I';
-        txBuffer[index++] = 'O';
-        txBuffer[index++] = 'N';
-        txBuffer[index++] = ' ';
-        txBuffer[index++] = 'O';
-        txBuffer[index++] = 'N';
-    } else {
-        txBuffer[index++] = 'R';
-        txBuffer[index++] = 'E';
-        txBuffer[index++] = 'B';
-        txBuffer[index++] = 'E';
-        txBuffer[index++] = 'L';
-        txBuffer[index++] = 'L';
-        txBuffer[index++] = 'I';
-        txBuffer[index++] = 'O';
-        txBuffer[index++] = 'N';
-        txBuffer[index++] = ' ';
-        txBuffer[index++] = 'O';
-        txBuffer[index++] = 'F';
-        txBuffer[index++] = 'F';
-    }
-    return index;
-}
-
-static unsigned char Controller_SetReplyGroupC (unsigned char reply, unsigned char index) {
-    if (reply == REPLY_CONSUME_OK) {
-        txBuffer[index++] = 'C';
-        txBuffer[index++] = 'O';
-        txBuffer[index++] = 'N';
-        txBuffer[index++] = 'S';
-        txBuffer[index++] = 'U';
-        txBuffer[index++] = 'M';
-        txBuffer[index++] = 'E';
-        txBuffer[index++] = ' ';
-        txBuffer[index++] = 'O';
-        txBuffer[index++] = 'K';
-    } else {
-        txBuffer[index++] = 'C';
-        txBuffer[index++] = 'O';
-        txBuffer[index++] = 'N';
-        txBuffer[index++] = 'S';
-        txBuffer[index++] = 'U';
-        txBuffer[index++] = 'M';
-        txBuffer[index++] = 'E';
-        txBuffer[index++] = ' ';
-        txBuffer[index++] = 'E';
-        txBuffer[index++] = 'R';
-        txBuffer[index++] = 'R';
-        txBuffer[index++] = 'O';
-        txBuffer[index++] = 'R';
-    }
-    return index;
-}
-
-static unsigned char Controller_SetReplyShort (unsigned char reply, unsigned char index) {
-    if (reply == REPLY_BUTTON) {
-        txBuffer[index++] = 'S';
-    } else if (reply == REPLY_FINISH_ANIMALS) {
-        txBuffer[index++] = 'F';
-    } else if (reply == REPLY_UP) {
-        txBuffer[index++] = 'U';
-    } else if (reply == REPLY_DOWN) {
-        txBuffer[index++] = 'D';
-    } else if (reply == REPLY_LEFT) {
-        txBuffer[index++] = 'L';
-    } else {
-        txBuffer[index++] = 'R';
-    }
-    return index;
-}
-
-static void Controller_EndReply (unsigned char index) {
-    txBuffer[index++] = '\r';
-    txBuffer[index++] = '\n';
-    txBuffer[index] = '\0';
-    txLine = txBuffer;
-}
-
-static void Controller_SetReply (unsigned char reply) {
-    unsigned char index = 0;
-
-    if (reply <= REPLY_SLEEP_ERROR) {
-        index = Controller_SetReplyGroupA(reply, index);
-    } else if (reply <= REPLY_REBELLION_OFF) {
-        index = Controller_SetReplyGroupB(reply, index);
-    } else if (reply <= REPLY_CONSUME_ERROR) {
-        index = Controller_SetReplyGroupC(reply, index);
-    } else {
-        index = Controller_SetReplyShort(reply, index);
+        case REPLY_RESET_OK:
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'T';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'K';
+            break;
+        case REPLY_REBELLION_ON:
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'B';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            break;
+        case REPLY_REBELLION_OFF:
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'B';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'F';
+            txBuffer[index++] = 'F';
+            break;
+        case REPLY_CONSUME_OK:
+            txBuffer[index++] = 'C';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'U';
+            txBuffer[index++] = 'M';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'K';
+            break;
+        case REPLY_CONSUME_ERROR:
+            txBuffer[index++] = 'C';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'U';
+            txBuffer[index++] = 'M';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'R';
+            break;
+        case REPLY_BUTTON:
+            txBuffer[index++] = 'S';
+            break;
+        case REPLY_FINISH_ANIMALS:
+            txBuffer[index++] = 'F';
+            break;
+        case REPLY_UP:
+            txBuffer[index++] = 'U';
+            break;
+        case REPLY_DOWN:
+            txBuffer[index++] = 'D';
+            break;
+        case REPLY_LEFT:
+            txBuffer[index++] = 'L';
+            break;
+        default:
+            txBuffer[index++] = 'R';
+            break;
     }
 
     Controller_EndReply(index);
