@@ -85,55 +85,34 @@ static void Controller_SetReply (unsigned char reply) {
             txBuffer[index++] = 'N';
             txBuffer[index++] = 'I';
             txBuffer[index++] = 'T';
-            txBuffer[index++] = ' ';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'K';
-            break;
+            goto appendOk;
         case REPLY_INIT_ERROR:
             txBuffer[index++] = 'I';
             txBuffer[index++] = 'N';
             txBuffer[index++] = 'I';
             txBuffer[index++] = 'T';
-            txBuffer[index++] = ' ';
-            txBuffer[index++] = 'E';
-            txBuffer[index++] = 'R';
-            txBuffer[index++] = 'R';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'R';
-            break;
+            goto appendError;
         case REPLY_SLEEP_OK:
             txBuffer[index++] = 'S';
             txBuffer[index++] = 'L';
             txBuffer[index++] = 'E';
             txBuffer[index++] = 'E';
             txBuffer[index++] = 'P';
-            txBuffer[index++] = ' ';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'K';
-            break;
+            goto appendOk;
         case REPLY_SLEEP_ERROR:
             txBuffer[index++] = 'S';
             txBuffer[index++] = 'L';
             txBuffer[index++] = 'E';
             txBuffer[index++] = 'E';
             txBuffer[index++] = 'P';
-            txBuffer[index++] = ' ';
-            txBuffer[index++] = 'E';
-            txBuffer[index++] = 'R';
-            txBuffer[index++] = 'R';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'R';
-            break;
+            goto appendError;
         case REPLY_RESET_OK:
             txBuffer[index++] = 'R';
             txBuffer[index++] = 'E';
             txBuffer[index++] = 'S';
             txBuffer[index++] = 'E';
             txBuffer[index++] = 'T';
-            txBuffer[index++] = ' ';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'K';
-            break;
+            goto appendOk;
         case REPLY_REBELLION_ON:
             txBuffer[index++] = 'R';
             txBuffer[index++] = 'E';
@@ -144,10 +123,7 @@ static void Controller_SetReply (unsigned char reply) {
             txBuffer[index++] = 'I';
             txBuffer[index++] = 'O';
             txBuffer[index++] = 'N';
-            txBuffer[index++] = ' ';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'N';
-            break;
+            goto appendOn;
         case REPLY_REBELLION_OFF:
             txBuffer[index++] = 'R';
             txBuffer[index++] = 'E';
@@ -158,11 +134,7 @@ static void Controller_SetReply (unsigned char reply) {
             txBuffer[index++] = 'I';
             txBuffer[index++] = 'O';
             txBuffer[index++] = 'N';
-            txBuffer[index++] = ' ';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'F';
-            txBuffer[index++] = 'F';
-            break;
+            goto appendOff;
         case REPLY_CONSUME_OK:
             txBuffer[index++] = 'C';
             txBuffer[index++] = 'O';
@@ -171,10 +143,7 @@ static void Controller_SetReply (unsigned char reply) {
             txBuffer[index++] = 'U';
             txBuffer[index++] = 'M';
             txBuffer[index++] = 'E';
-            txBuffer[index++] = ' ';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'K';
-            break;
+            goto appendOk;
         case REPLY_CONSUME_ERROR:
             txBuffer[index++] = 'C';
             txBuffer[index++] = 'O';
@@ -183,13 +152,7 @@ static void Controller_SetReply (unsigned char reply) {
             txBuffer[index++] = 'U';
             txBuffer[index++] = 'M';
             txBuffer[index++] = 'E';
-            txBuffer[index++] = ' ';
-            txBuffer[index++] = 'E';
-            txBuffer[index++] = 'R';
-            txBuffer[index++] = 'R';
-            txBuffer[index++] = 'O';
-            txBuffer[index++] = 'R';
-            break;
+            goto appendError;
         case REPLY_BUTTON:
             txBuffer[index++] = 'S';
             break;
@@ -205,11 +168,44 @@ static void Controller_SetReply (unsigned char reply) {
         case REPLY_LEFT:
             txBuffer[index++] = 'L';
             break;
+        case REPLY_RIGHT:
+            txBuffer[index++] = 'R';
+            break;
         default:
             txBuffer[index++] = 'R';
             break;
     }
 
+    goto endReply;
+
+appendOk:
+    txBuffer[index++] = ' ';
+    txBuffer[index++] = 'O';
+    txBuffer[index++] = 'K';
+    goto endReply;
+
+appendError:
+    txBuffer[index++] = ' ';
+    txBuffer[index++] = 'E';
+    txBuffer[index++] = 'R';
+    txBuffer[index++] = 'R';
+    txBuffer[index++] = 'O';
+    txBuffer[index++] = 'R';
+    goto endReply;
+
+appendOn:
+    txBuffer[index++] = ' ';
+    txBuffer[index++] = 'O';
+    txBuffer[index++] = 'N';
+    goto endReply;
+
+appendOff:
+    txBuffer[index++] = ' ';
+    txBuffer[index++] = 'O';
+    txBuffer[index++] = 'F';
+    txBuffer[index++] = 'F';
+
+endReply:
     Controller_EndReply(index);
 }
 
@@ -542,9 +538,6 @@ static unsigned char Controller_ProcessInputs (void) {
     }
 
     return 0;
-}
-
-void Controller_Init (void) {
 }
 
 void motorController (void) {

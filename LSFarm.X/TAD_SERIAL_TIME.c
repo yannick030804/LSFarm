@@ -6,7 +6,6 @@
 #define ST_FLAG_RX_READY 0x01
 #define ST_FLAG_RX_ACTIVE 0x02
 #define ST_FLAG_TX_ACTIVE 0x04
-#define ST_FLAG_TIME_CONFIGURED 0x08
 
 static unsigned char timerHandle;
 
@@ -25,11 +24,12 @@ static const char *txPtr;
 
 static char rxChars[SERIAL_TIME_LINE_MAX];
 static unsigned char rxLen;
-static unsigned char currentDay;
-static unsigned char currentMonth;
-static unsigned char currentHour;
-static unsigned char currentMinute;
-static unsigned char currentSecond;
+unsigned char serialTimeConfigured;
+unsigned char serialTimeDay;
+unsigned char serialTimeMonth;
+unsigned char serialTimeHour;
+unsigned char serialTimeMinute;
+unsigned char serialTimeSecond;
 
 static unsigned char isDigit (char c) {
     if (c >= '0' && c <= '9') {
@@ -76,12 +76,12 @@ static unsigned char SerialTime_ParseLine (void) {
         return 0;
     }
 
-    currentDay = day;
-    currentMonth = month;
-    currentHour = hour;
-    currentMinute = minute;
-    currentSecond = second;
-    stFlags |= ST_FLAG_TIME_CONFIGURED;
+    serialTimeDay = day;
+    serialTimeMonth = month;
+    serialTimeHour = hour;
+    serialTimeMinute = minute;
+    serialTimeSecond = second;
+    serialTimeConfigured = 1;
     return 1;
 }
 
@@ -198,21 +198,21 @@ void motorSerialTime (void) {
         case 2:
             if (TI_GetTics(timerHandle) >= 1000) {
                 TI_ResetTics(timerHandle);
-                currentSecond++;
-                if (currentSecond > 59) {
-                    currentSecond = 0;
-                    currentMinute++;
-                    if (currentMinute > 59) {
-                        currentMinute = 0;
-                        currentHour++;
-                        if (currentHour > 23) {
-                            currentHour = 0;
-                            currentDay++;
-                            if (currentDay > 31) {
-                                currentDay = 1;
-                                currentMonth++;
-                                if (currentMonth > 12) {
-                                    currentMonth = 1;
+                serialTimeSecond++;
+                if (serialTimeSecond > 59) {
+                    serialTimeSecond = 0;
+                    serialTimeMinute++;
+                    if (serialTimeMinute > 59) {
+                        serialTimeMinute = 0;
+                        serialTimeHour++;
+                        if (serialTimeHour > 23) {
+                            serialTimeHour = 0;
+                            serialTimeDay++;
+                            if (serialTimeDay > 31) {
+                                serialTimeDay = 1;
+                                serialTimeMonth++;
+                                if (serialTimeMonth > 12) {
+                                    serialTimeMonth = 1;
                                 }
                             }
                         }
@@ -265,28 +265,4 @@ void SerialTime_TickISR (void) {
     }
 
     txTick();
-}
-
-unsigned char SerialTime_IsConfigured (void) {
-    return (unsigned char)((stFlags & ST_FLAG_TIME_CONFIGURED) != 0);
-}
-
-unsigned char SerialTime_GetDay (void) {
-    return currentDay;
-}
-
-unsigned char SerialTime_GetMonth (void) {
-    return currentMonth;
-}
-
-unsigned char SerialTime_GetHour (void) {
-    return currentHour;
-}
-
-unsigned char SerialTime_GetMinute (void) {
-    return currentMinute;
-}
-
-unsigned char SerialTime_GetSecond (void) {
-    return currentSecond;
 }

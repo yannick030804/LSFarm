@@ -16,9 +16,6 @@ static void launchWrite (void) {
     ei();
 }
 
-void EEPROM_Init (void) {
-}
-
 void motorEEPROM (void) {
     if (mode == 0) {
         return;
