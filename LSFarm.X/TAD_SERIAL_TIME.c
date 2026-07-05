@@ -11,7 +11,8 @@ static unsigned char timerHandle;
 
 static volatile unsigned char rxByte;
 static volatile unsigned char stFlags;
-static volatile unsigned char bitIdxPair;
+static volatile unsigned char rxBitIdx;
+static volatile unsigned char txBitIdx;
 static volatile unsigned char rxShift;
 static volatile unsigned char rxPos;
 static volatile unsigned char rxNext;
@@ -21,7 +22,6 @@ static volatile unsigned char txPos;
 static volatile unsigned char txNext;
 static volatile unsigned char txEcho;
 static const char *txPtr;
-static unsigned char txMessageState;
 
 static char rxChars[SERIAL_TIME_LINE_MAX];
 static unsigned char rxLen;
@@ -86,25 +86,8 @@ static unsigned char SerialTime_ParseLine (void) {
     return 1;
 }
 
-static unsigned char getRxBitIdx (void) {
-    return (unsigned char)(bitIdxPair & 0x0F);
-}
-
-static void setRxBitIdx (unsigned char value) {
-    bitIdxPair = (unsigned char)((bitIdxPair & 0xF0) | (value & 0x0F));
-}
-
-static unsigned char getTxBitIdx (void) {
-    return (unsigned char)((bitIdxPair >> 4) & 0x0F);
-}
-
-static void setTxBitIdx (unsigned char value) {
-    bitIdxPair = (unsigned char)((bitIdxPair & 0x0F) | ((value & 0x0F) << 4));
-}
-
 static void txTick (void) {
     unsigned char b;
-    unsigned char txBitIdx;
 
     if ((stFlags & ST_FLAG_TX_ACTIVE) == 0) {
         b = 0;
@@ -117,41 +100,13 @@ static void txTick (void) {
                 b = *txPtr;
                 txPtr++;
             } else {
-                switch (txMessageState) {
-                    case 1:
-                        txPtr = "Date and time ";
-                        txMessageState = 2;
-                        break;
-                    case 2:
-                        txPtr = "correct";
-                        txMessageState = 3;
-                        break;
-                    case 3:
-                        txPtr = "\r\n";
-                        txMessageState = 0;
-                        break;
-                    case 4:
-                        txPtr = "Please input a ";
-                        txMessageState = 5;
-                        break;
-                    case 5:
-                        txPtr = "correct ";
-                        txMessageState = 6;
-                        break;
-                    case 6:
-                        txPtr = "date";
-                        txMessageState = 3;
-                        break;
-                    default:
-                        txPtr = 0;
-                        break;
-                }
+                txPtr = 0;
             }
         }
 
         if (b != 0) {
             txShift = b;
-            setTxBitIdx(0);
+            txBitIdx = 0;
             txPos = 0;
             txNext = 3;
             stFlags |= ST_FLAG_TX_ACTIVE;
@@ -165,7 +120,6 @@ static void txTick (void) {
     }
     txNext = (unsigned char)(txNext + 10);
 
-    txBitIdx = getTxBitIdx();
     if (txBitIdx == 0) {
         LATBbits.LATB1 = 0;
     } else if (txBitIdx <= 8) {
@@ -178,7 +132,7 @@ static void txTick (void) {
         return;
     }
 
-    setTxBitIdx((unsigned char)(txBitIdx + 1));
+    txBitIdx++;
 }
 
 void SerialTime_Init (void) {
@@ -216,11 +170,9 @@ void motorSerialTime (void) {
             break;
         case 1:
             if (SerialTime_ParseLine() == 1) {
-                txPtr = "\r\n";
-                txMessageState = 1;
+                txPtr = "\r\nDate and time correct\r\n";
             } else {
-                txPtr = "\r\n";
-                txMessageState = 4;
+                txPtr = "\r\nPlease input a correct date\r\n";
             }
             rxLen = 0;
             state = 2;
@@ -257,15 +209,13 @@ void motorSerialTime (void) {
 void SerialTime_StartBitISR (void) {
     INTCON3bits.INT2IE = 0;
     rxShift = 0;
-    setRxBitIdx(0);
+    rxBitIdx = 0;
     rxPos = 0;
     rxNext = 15;
     stFlags |= ST_FLAG_RX_ACTIVE;
 }
 
 void SerialTime_TickISR (void) {
-    unsigned char rxBitIdx;
-
     if ((stFlags & ST_FLAG_RX_ACTIVE) == 0) {
         txTick();
         return;
@@ -278,13 +228,12 @@ void SerialTime_TickISR (void) {
     }
     rxNext = (unsigned char)(rxNext + 10);
 
-    rxBitIdx = getRxBitIdx();
     if (rxBitIdx < 8) {
         rxShift >>= 1;
         if (PORTBbits.RB2) {
             rxShift |= 0x80;
         }
-        setRxBitIdx((unsigned char)(rxBitIdx + 1));
+        rxBitIdx++;
     } else {
         if (PORTBbits.RB2) {
             rxByte = rxShift;

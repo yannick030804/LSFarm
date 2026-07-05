@@ -6,14 +6,10 @@
 #include "TAD_TIMER.h"
 
 #define DISPLAY_MESSAGE_TIME 3000UL
-#define DISPLAY_TIMER_MASK 0x07
-#define DISPLAY_STATE_SHIFT 3
-#define DISPLAY_TIMER_HANDLE() ((unsigned char)(displayCtrl & DISPLAY_TIMER_MASK))
-#define DISPLAY_GET_STATE() ((unsigned char)(displayCtrl >> DISPLAY_STATE_SHIFT))
-#define DISPLAY_SET_STATE(value) (displayCtrl = (char)((displayCtrl & DISPLAY_TIMER_MASK) | ((value) << DISPLAY_STATE_SHIFT)))
 
 static char displayLine[17];
-static char displayCtrl;
+static unsigned char timerHandle;
+static unsigned char displayState;
 
 static void Display_LoadMessage (unsigned char messageId) {
     if (messageId < 2) {
@@ -164,25 +160,25 @@ static void Display_ShowIdleScreen (void) {
 }
 
 void Display_Init (void) {
-    TI_NewTimer((unsigned char *)&displayCtrl);
+    TI_NewTimer(&timerHandle);
 }
 
 void motorDisplay (void) {
     FarmNotification notification;
 
-    switch (DISPLAY_GET_STATE()) {
+    switch (displayState) {
         case 0:
             if (Farm_GetNotification(&notification) == 1) {
                 Display_ShowNotification(&notification);
-                TI_ResetTics(DISPLAY_TIMER_HANDLE());
-                DISPLAY_SET_STATE(DISPLAY_GET_STATE() + 1);
+                TI_ResetTics(timerHandle);
+                displayState = 1;
             } else {
                 Display_ShowIdleScreen();
             }
             break;
         case 1:
-            if (TI_GetTics(DISPLAY_TIMER_HANDLE()) >= DISPLAY_MESSAGE_TIME) {
-                DISPLAY_SET_STATE(DISPLAY_GET_STATE() - 1);
+            if (TI_GetTics(timerHandle) >= DISPLAY_MESSAGE_TIME) {
+                displayState = 0;
             }
             break;
     }

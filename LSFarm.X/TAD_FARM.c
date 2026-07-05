@@ -4,6 +4,7 @@
 
 #define FARM_MAX_NAME 16
 #define FARM_MAX_ANIMALS 24
+#define FARM_NUM_SPECIES 4
 #define FARM_MIN_ANIMALS_PER_SPECIES 3
 
 #define SPECIES_COW 0
@@ -28,14 +29,14 @@
 #define ANIMAL_IS_CRITICAL(index) ((unsigned char)((animalInfo[(index)] & ANIMAL_CRITICAL_MASK) != 0))
 
 static unsigned char timerHandle;
-unsigned char Farm_Configured;
+static unsigned char configured;
 static unsigned char rebellion;
 static unsigned char resetRequested;
-unsigned char Farm_DirtyState;
+static unsigned char dirtyState;
 static unsigned char currentDateValid;
 static unsigned long currentStamp;
 
-char Farm_Name[FARM_MAX_NAME + 1];
+static char farmName[FARM_MAX_NAME + 1];
 static const char *pendingName;
 static unsigned char pendingTimes[FARM_NUM_SPECIES];
 static unsigned char configRequested;
@@ -43,19 +44,19 @@ static unsigned char configRequested;
 static unsigned char generationTimes[FARM_NUM_SPECIES];
 static unsigned char animalCounts[FARM_NUM_SPECIES];
 static unsigned char criticalCounts[FARM_NUM_SPECIES];
-unsigned char Farm_ProductCounts[FARM_NUM_SPECIES];
+static unsigned char productCounts[FARM_NUM_SPECIES];
 
-unsigned char Farm_TotalAnimals;
+static unsigned char totalAnimals;
 
 static unsigned char selectedAnimalSpecies;
 static unsigned char selectedAnimalNumber;
 static signed char selectedAnimalIndex;
 static unsigned char searchRequested;
-unsigned char Farm_SearchFinished;
-unsigned char Farm_SearchFound;
-unsigned char Farm_RestRequestPending;
-unsigned char Farm_RestFinished;
-unsigned char Farm_RestSuccess;
+static unsigned char searchFinished;
+static unsigned char searchFound;
+static unsigned char restRequestPending;
+static unsigned char restFinished;
+static unsigned char restSuccess;
 
 static unsigned char lastGeneration[FARM_NUM_SPECIES];
 static unsigned char lastProduct[FARM_NUM_SPECIES];
@@ -67,22 +68,12 @@ static unsigned char notificationValues[FARM_NOTIFICATION_QUEUE_SIZE];
 static unsigned char notificationHead;
 static unsigned char notificationCount;
 
-#define configured Farm_Configured
-#define dirtyState Farm_DirtyState
-#define farmName Farm_Name
-#define productCounts Farm_ProductCounts
-#define totalAnimals Farm_TotalAnimals
-#define searchFinished Farm_SearchFinished
-#define searchFound Farm_SearchFound
-#define restRequestPending Farm_RestRequestPending
-#define restFinished Farm_RestFinished
-#define restSuccess Farm_RestSuccess
-
 static void resetFarmData (void);
 static void Farm_ClearCurrentData (void);
 static void Farm_RecountAnimals (void);
 static void Farm_PushNotification (unsigned char kind, unsigned char species, unsigned char number);
 static unsigned char Farm_CreateAnimal (unsigned char species);
+static void Farm_TakeProduct (unsigned char species, unsigned char amount);
 static void Farm_ProcessGeneration (unsigned char species, unsigned char now);
 static void Farm_ProcessProducts (unsigned char species, unsigned char now);
 static void Farm_ProcessCriticalAnimal (unsigned char index);
@@ -246,6 +237,26 @@ void Farm_RequestSelectAnimal (unsigned char species, unsigned char number) {
     searchRequested = 1;
 }
 
+unsigned char Farm_IsSearchFinished (void) {
+    return searchFinished;
+}
+
+unsigned char Farm_IsAnimalFound (void) {
+    return searchFound;
+}
+
+unsigned char Farm_IsRestRequestPending (void) {
+    return restRequestPending;
+}
+
+unsigned char Farm_IsRestFinished (void) {
+    return restFinished;
+}
+
+unsigned char Farm_IsRestSuccess (void) {
+    return restSuccess;
+}
+
 void Farm_NotifyRestSuccess (void) {
     unsigned char index;
     unsigned char species;
@@ -279,6 +290,18 @@ void Farm_NotifyRestTimeout (void) {
     restFinished = 1;
 }
 
+unsigned char Farm_IsConfigured (void) {
+    return configured;
+}
+
+const char *Farm_GetName (void) {
+    return farmName;
+}
+
+unsigned char Farm_GetAnimalCount (void) {
+    return totalAnimals;
+}
+
 void Farm_GetAnimal (unsigned char index, unsigned char *species, unsigned char *number, unsigned char *critical) {
     unsigned char i;
     unsigned char count = 0;
@@ -295,6 +318,10 @@ void Farm_GetAnimal (unsigned char index, unsigned char *species, unsigned char 
     *number = count;
 }
 
+unsigned char Farm_GetProductTotal (unsigned char species) {
+    return PRODUCT_COUNT(species);
+}
+
 void Farm_SetRebellion (unsigned char active) {
     rebellion = active;
 }
@@ -302,27 +329,17 @@ void Farm_SetRebellion (unsigned char active) {
 void Farm_Consume (unsigned char recipe) {
     switch (recipe) {
         case 0:
-            if (PRODUCT_COUNT(SPECIES_CHICKEN) >= 1) {
-                PRODUCT_COUNT(SPECIES_CHICKEN)--;
-            }
+            Farm_TakeProduct(SPECIES_CHICKEN, 1);
             break;
         case 1:
-            if (PRODUCT_COUNT(SPECIES_CHICKEN) >= 1) {
-                PRODUCT_COUNT(SPECIES_CHICKEN)--;
-            }
-            if (PRODUCT_COUNT(SPECIES_PIG) >= 1) {
-                PRODUCT_COUNT(SPECIES_PIG)--;
-            }
+            Farm_TakeProduct(SPECIES_CHICKEN, 1);
+            Farm_TakeProduct(SPECIES_PIG, 1);
             break;
         case 2:
-            if (PRODUCT_COUNT(SPECIES_COW) >= 2) {
-                PRODUCT_COUNT(SPECIES_COW) = (unsigned char)(PRODUCT_COUNT(SPECIES_COW) - 2);
-            }
+            Farm_TakeProduct(SPECIES_COW, 2);
             break;
         case 3:
-            if (PRODUCT_COUNT(SPECIES_HORSE) >= 2) {
-                PRODUCT_COUNT(SPECIES_HORSE) = (unsigned char)(PRODUCT_COUNT(SPECIES_HORSE) - 2);
-            }
+            Farm_TakeProduct(SPECIES_HORSE, 2);
             break;
     }
     dirtyState = 1;
@@ -426,6 +443,14 @@ void Farm_EndImportState (void) {
     dirtyState = 0;
 }
 
+unsigned char Farm_IsDirty (void) {
+    return dirtyState;
+}
+
+void Farm_ClearDirty (void) {
+    dirtyState = 0;
+}
+
 static void resetFarmData (void) {
     configured = 0;
     rebellion = 0;
@@ -514,6 +539,12 @@ static unsigned char Farm_CreateAnimal (unsigned char species) {
     animalSleepStamp[totalAnimals] = currentStamp;
     totalAnimals++;
     return 1;
+}
+
+static void Farm_TakeProduct (unsigned char species, unsigned char amount) {
+    if (PRODUCT_COUNT(species) >= amount) {
+        PRODUCT_COUNT(species) = (unsigned char)(PRODUCT_COUNT(species) - amount);
+    }
 }
 
 static void Farm_ProcessGeneration (unsigned char species, unsigned char now) {
