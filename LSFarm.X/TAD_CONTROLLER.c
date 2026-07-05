@@ -329,7 +329,11 @@ static void Controller_ServiceFarm (void) {
         Farm_SetCurrentDate(0, 0, 0, 0, 0, 0);
     }
 
-    if ((controllerFlags & CTRL_FLAG_PERSISTENCE_LOADED) == 0 && EEPROM_IsBusy() == 0) {
+    if (EEPROM_IsBusy() != 0) {
+        return;
+    }
+
+    if ((controllerFlags & CTRL_FLAG_PERSISTENCE_LOADED) == 0) {
         if (EEPROM_ReadByte(0) == FARM_STATE_MAGIC) {
             Farm_BeginImportState();
             for (persistenceIndex = 0; persistenceIndex < FARM_STATE_SIZE; persistenceIndex++) {
@@ -340,13 +344,13 @@ static void Controller_ServiceFarm (void) {
         controllerFlags |= CTRL_FLAG_PERSISTENCE_LOADED;
     }
 
-    if ((controllerFlags & CTRL_FLAG_RESET_PENDING) != 0 && EEPROM_IsBusy() == 0) {
+    if ((controllerFlags & CTRL_FLAG_RESET_PENDING) != 0) {
         EEPROM_RequestClear();
         controllerFlags &= (unsigned char)(~CTRL_FLAG_RESET_PENDING);
         return;
     }
 
-    if ((controllerFlags & CTRL_FLAG_SAVE_ACTIVE) != 0 && EEPROM_IsBusy() == 0) {
+    if ((controllerFlags & CTRL_FLAG_SAVE_ACTIVE) != 0) {
         if (persistenceIndex == 0) {
             if (EEPROM_StartByteWrite(0, FARM_STATE_MAGIC) == 1) {
                 persistenceIndex = 1;
@@ -362,7 +366,7 @@ static void Controller_ServiceFarm (void) {
         return;
     }
 
-    if (Farm_IsDirty() == 1 && EEPROM_IsBusy() == 0 && Farm_IsConfigured() == 1) {
+    if (Farm_IsDirty() == 1 && Farm_IsConfigured() == 1) {
         controllerFlags |= CTRL_FLAG_SAVE_ACTIVE;
         persistenceIndex = 0;
     }

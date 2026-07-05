@@ -1,7 +1,7 @@
 #include <xc.h>
 #include "TAD_EEPROM.h"
 
-static unsigned char mode;
+unsigned char eepromMode;
 static unsigned char clearIndex;
 
 static void launchWrite (void) {
@@ -17,7 +17,7 @@ static void launchWrite (void) {
 }
 
 void motorEEPROM (void) {
-    if (mode == 0) {
+    if (eepromMode == 0) {
         return;
     }
 
@@ -25,20 +25,20 @@ void motorEEPROM (void) {
         return;
     }
 
-    if (mode == 2) {
+    if (eepromMode == 2) {
         EEADR = clearIndex;
         EEDATA = 0;
         launchWrite();
         clearIndex++;
         if (clearIndex == 0) {
-            mode = 3;
+            eepromMode = 3;
         }
-    } else if (mode == 1) {
+    } else if (eepromMode == 1) {
         launchWrite();
-        mode = 3;
+        eepromMode = 3;
     } else {
         EECON1bits.WREN = 0;
-        mode = 0;
+        eepromMode = 0;
     }
 }
 
@@ -51,25 +51,21 @@ unsigned char EEPROM_ReadByte (unsigned char addr) {
 }
 
 unsigned char EEPROM_StartByteWrite (unsigned char addr, unsigned char data) {
-    if (mode != 0) {
+    if (eepromMode != 0) {
         return 0;
     }
 
     EEADR = addr;
     EEDATA = data;
-    mode = 1;
+    eepromMode = 1;
     return 1;
 }
 
 void EEPROM_RequestClear (void) {
-    if (mode != 0) {
+    if (eepromMode != 0) {
         return;
     }
 
     clearIndex = 0;
-    mode = 2;
-}
-
-unsigned char EEPROM_IsBusy (void) {
-    return (unsigned char)(mode != 0);
+    eepromMode = 2;
 }

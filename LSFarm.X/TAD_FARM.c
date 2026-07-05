@@ -18,7 +18,6 @@
 #define ANIMAL_CRITICAL_MASK 0x80
 #define YEAR_SECONDS 31536000UL
 #define FARM_NOTIFICATION_MASK (FARM_NOTIFICATION_QUEUE_SIZE - 1)
-#define PENDING_TIME(species) pendingTimes[(species)]
 #define GENERATION_TIME(species) generationTimes[(species)]
 #define ANIMAL_COUNT(species) animalCounts[(species)]
 #define CRITICAL_COUNT(species) criticalCounts[(species)]
@@ -30,7 +29,7 @@
 
 static unsigned char timerHandle;
 unsigned char configured;
-static unsigned char rebellion;
+unsigned char farmRebellion;
 static unsigned char resetRequested;
 unsigned char dirtyState;
 static unsigned char currentDateValid;
@@ -38,7 +37,6 @@ static unsigned long currentStamp;
 
 char farmName[FARM_MAX_NAME + 1];
 static const char *pendingName;
-static unsigned char pendingTimes[FARM_NUM_SPECIES];
 static unsigned char configRequested;
 
 static unsigned char generationTimes[FARM_NUM_SPECIES];
@@ -79,7 +77,6 @@ static void Farm_ProcessProducts (unsigned char species, unsigned char now);
 static void Farm_ProcessCriticalAnimal (unsigned char index);
 static void Farm_ResetSelectionState (void);
 static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second);
-static unsigned char Farm_GetNowSeconds (void);
 static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index);
 static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes);
 static unsigned char Farm_ExportAnimalByte (unsigned char index);
@@ -101,11 +98,6 @@ void motorFarm (void) {
 
     if (resetRequested == 1) {
         state = 0;
-        copyIndex = 0;
-        speciesIndex = 0;
-        animalIndex = 0;
-        speciesNumber = 0;
-        now = 0;
         resetRequested = 0;
     }
 
@@ -129,19 +121,23 @@ void motorFarm (void) {
 
         case 2:
             Farm_ClearCurrentData();
-            GENERATION_TIME(SPECIES_COW) = PENDING_TIME(SPECIES_COW);
-            GENERATION_TIME(SPECIES_PIG) = PENDING_TIME(SPECIES_PIG);
-            GENERATION_TIME(SPECIES_HORSE) = PENDING_TIME(SPECIES_HORSE);
-            GENERATION_TIME(SPECIES_CHICKEN) = PENDING_TIME(SPECIES_CHICKEN);
             configured = 1;
             configRequested = 0;
             dirtyState = 1;
+            now = 0;
             TI_ResetTics(timerHandle);
             state++;
             break;
 
         case 3:
-            if (configured == 0 || currentDateValid == 0) {
+            if (configured == 0) {
+                break;
+            }
+            if (TI_GetTics(timerHandle) >= 1000UL) {
+                TI_ResetTics(timerHandle);
+                now++;
+            }
+            if (currentDateValid == 0) {
                 break;
             }
             speciesIndex = 0;
@@ -149,7 +145,6 @@ void motorFarm (void) {
             break;
 
         case 4:
-            now = Farm_GetNowSeconds();
             if (speciesIndex < FARM_NUM_SPECIES) {
                 Farm_ProcessGeneration(speciesIndex, now);
                 speciesIndex++;
@@ -160,7 +155,6 @@ void motorFarm (void) {
             break;
 
         case 5:
-            now = Farm_GetNowSeconds();
             if (speciesIndex < FARM_NUM_SPECIES) {
                 Farm_ProcessProducts(speciesIndex, now);
                 speciesIndex++;
@@ -220,10 +214,10 @@ void Farm_Reset (void) {
 
 void Farm_RequestConfigure (const char *name, unsigned char cow, unsigned char horse, unsigned char pig, unsigned char chicken) {
     pendingName = name;
-    PENDING_TIME(SPECIES_COW) = cow;
-    PENDING_TIME(SPECIES_HORSE) = horse;
-    PENDING_TIME(SPECIES_PIG) = pig;
-    PENDING_TIME(SPECIES_CHICKEN) = chicken;
+    GENERATION_TIME(SPECIES_COW) = cow;
+    GENERATION_TIME(SPECIES_HORSE) = horse;
+    GENERATION_TIME(SPECIES_PIG) = pig;
+    GENERATION_TIME(SPECIES_CHICKEN) = chicken;
     Farm_ResetSelectionState();
     configRequested = 1;
     configured = 0;
@@ -233,7 +227,6 @@ void Farm_RequestSelectAnimal (unsigned char species, unsigned char number) {
     Farm_ResetSelectionState();
     selectedAnimalSpecies = species;
     selectedAnimalNumber = number;
-    selectedAnimalIndex = -1;
     searchRequested = 1;
 }
 
@@ -284,10 +277,6 @@ void Farm_GetAnimal (unsigned char index, unsigned char *species, unsigned char 
     }
 
     *number = count;
-}
-
-void Farm_SetRebellion (unsigned char active) {
-    rebellion = active;
 }
 
 void Farm_Consume (unsigned char recipe) {
@@ -409,7 +398,7 @@ void Farm_EndImportState (void) {
 
 static void resetFarmData (void) {
     configured = 0;
-    rebellion = 0;
+    farmRebellion = 0;
     resetRequested = 0;
     dirtyState = 0;
     currentDateValid = 0;
@@ -422,10 +411,6 @@ static void resetFarmData (void) {
     notificationCount = 0;
     Farm_ResetSelectionState();
 
-    PENDING_TIME(SPECIES_COW) = 0;
-    PENDING_TIME(SPECIES_PIG) = 0;
-    PENDING_TIME(SPECIES_HORSE) = 0;
-    PENDING_TIME(SPECIES_CHICKEN) = 0;
     Farm_ClearSpeciesData(1);
 }
 
@@ -433,7 +418,7 @@ static void Farm_ClearCurrentData (void) {
     totalAnimals = 0;
     notificationHead = 0;
     notificationCount = 0;
-    rebellion = 0;
+    farmRebellion = 0;
     dirtyState = 0;
     Farm_ResetSelectionState();
     Farm_ClearSpeciesData(0);
@@ -523,7 +508,7 @@ static void Farm_ProcessProducts (unsigned char species, unsigned char now) {
     unsigned char totalProducts;
     unsigned char productTime;
 
-    if (rebellion == 1) {
+    if (farmRebellion == 1) {
         return;
     }
 
@@ -577,8 +562,6 @@ static void Farm_ProcessCriticalAnimal (unsigned char index) {
 }
 
 static void Farm_ResetSelectionState (void) {
-    selectedAnimalSpecies = 0;
-    selectedAnimalNumber = 0;
     selectedAnimalIndex = -1;
     searchRequested = 0;
     searchFinished = 0;
@@ -632,18 +615,6 @@ static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char mon
     }
 
     return total;
-}
-
-static unsigned char Farm_GetNowSeconds (void) {
-    unsigned long tics = TI_GetTics(timerHandle);
-    unsigned char seconds = 0;
-
-    while (tics >= 1000UL) {
-        tics -= 1000UL;
-        seconds++;
-    }
-
-    return seconds;
 }
 
 static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index) {

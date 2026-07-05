@@ -3,7 +3,7 @@
 #include "TAD_TIMER.h"
 
 static unsigned char timerHandle;
-static unsigned char rebellion;
+unsigned char heartbeatRebellion;
 
 void Heartbeat_Init (void) {
     CONFIG_HEARTBEAT;
@@ -12,17 +12,10 @@ void Heartbeat_Init (void) {
     TI_ResetTics(timerHandle);
 }
 
-void Heartbeat_SetRebellion (unsigned char active) {
-    rebellion = active;
-    if (rebellion == 1) {
-        HEARTBEAT = 0;
-    }
-}
-
 void motorHeartbeat (void) {
     static unsigned char state = 0;
 
-    if (rebellion == 1) {
+    if (heartbeatRebellion == 1) {
         HEARTBEAT = 0;
         TI_ResetTics(timerHandle);
         state = 0;

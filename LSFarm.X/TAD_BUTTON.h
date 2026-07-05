@@ -6,8 +6,10 @@
 #define BUTTON JOYSTICK_SW
 #define REBOUNDS 16
 
+extern unsigned char buttonPressed;
+
 void Button_Init (void);
-unsigned char getButton (void);
+#define getButton() (buttonPressed ? (buttonPressed = 0, 1) : 0)
 void motorButton (void);
  
  #endif

@@ -14,6 +14,7 @@ typedef struct {
 
 extern unsigned char configured;
 extern unsigned char dirtyState;
+extern unsigned char farmRebellion;
 extern char farmName[];
 extern unsigned char productCounts[];
 extern unsigned char totalAnimals;
@@ -40,7 +41,7 @@ void Farm_NotifyRestTimeout (void);
 #define Farm_GetAnimalCount() (totalAnimals)
 void Farm_GetAnimal (unsigned char index, unsigned char *species, unsigned char *number, unsigned char *critical);
 #define Farm_GetProductTotal(species) (productCounts[(species)])
-void Farm_SetRebellion (unsigned char active);
+#define Farm_SetRebellion(active) (farmRebellion = (active))
 void Farm_Consume (unsigned char recipe);
 unsigned char Farm_GetNotification (FarmNotification *notification);
 void Farm_SetCurrentDate (unsigned char valid, unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second);

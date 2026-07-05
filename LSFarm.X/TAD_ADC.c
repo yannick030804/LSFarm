@@ -22,13 +22,3 @@ unsigned char ADC_Start(unsigned char channel)
     ADCON0bits.GO = 1;
     return 1;
 }
-
-unsigned char ADC_IsDone(void)
-{
-    return !ADCON0bits.GO;
-}
-
-unsigned char ADC_Read(void)
-{
-    return ADRESH;
-}
