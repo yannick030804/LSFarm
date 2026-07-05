@@ -101,11 +101,6 @@ void motorFarm (void) {
 
     if (resetRequested == 1) {
         state = 0;
-        copyIndex = 0;
-        speciesIndex = 0;
-        animalIndex = 0;
-        speciesNumber = 0;
-        now = 0;
         resetRequested = 0;
     }
 
@@ -233,7 +228,6 @@ void Farm_RequestSelectAnimal (unsigned char species, unsigned char number) {
     Farm_ResetSelectionState();
     selectedAnimalSpecies = species;
     selectedAnimalNumber = number;
-    selectedAnimalIndex = -1;
     searchRequested = 1;
 }
 
