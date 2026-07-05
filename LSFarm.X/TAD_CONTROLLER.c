@@ -30,7 +30,7 @@
 #define REPLY_RIGHT         14
 
 static const char *txLine;
-static char farmName[17];
+static char controllerFarmName[17];
 static char txBuffer[21];
 static unsigned char controllerFlags;
 static unsigned char persistenceIndex;
@@ -236,8 +236,8 @@ static unsigned char parseInitCommand (const char *text) {
     unsigned char chicken;
 
     while (text[i] != '$' && text[i] != '\0') {
-        if (nameIndex < sizeof(farmName) - 1) {
-            farmName[nameIndex++] = text[i];
+        if (nameIndex < sizeof(controllerFarmName) - 1) {
+            controllerFarmName[nameIndex++] = text[i];
         }
         i++;
     }
@@ -246,7 +246,7 @@ static unsigned char parseInitCommand (const char *text) {
         return 0;
     }
 
-    farmName[nameIndex] = '\0';
+    controllerFarmName[nameIndex] = '\0';
     i++;
 
     if (parseNumber(text, &i, &cow, '$') == 0) {
@@ -270,7 +270,7 @@ static unsigned char parseInitCommand (const char *text) {
         return 0;
     }
 
-    Farm_RequestConfigure(farmName, cow, horse, pig, chicken);
+    Farm_RequestConfigure(controllerFarmName, cow, horse, pig, chicken);
     return 1;
 }
 
