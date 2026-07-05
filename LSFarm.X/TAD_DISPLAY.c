@@ -15,6 +15,18 @@
 static char displayLine[17];
 static char displayCtrl;
 
+static void Display_Put2Digits (unsigned char index, unsigned char value) {
+    unsigned char digit = 0;
+
+    while (value >= 10) {
+        value = (unsigned char)(value - 10);
+        digit++;
+    }
+
+    displayLine[index] = (char)('0' + digit);
+    displayLine[index + 1] = (char)('0' + value);
+}
+
 static void Display_PutFixedLine (unsigned char row, const char *text) {
     unsigned char i = 0;
 
@@ -75,10 +87,6 @@ static void Display_ShowNotification (const FarmNotification *notification) {
 }
 
 static void Display_ShowIdleScreen (void) {
-    unsigned char day;
-    unsigned char digit;
-    unsigned char month;
-
     if (Farm_IsConfigured() == 0) {
         Display_ShowText("Esperando Init", "");
         return;
@@ -89,23 +97,9 @@ static void Display_ShowIdleScreen (void) {
         return;
     }
 
-    day = SerialTime_GetDay();
-    month = SerialTime_GetMonth();
-    digit = 0;
-    while (day >= 10) {
-        day = (unsigned char)(day - 10);
-        digit++;
-    }
-    displayLine[0] = (char)('0' + digit);
-    displayLine[1] = (char)('0' + day);
+    Display_Put2Digits(0, SerialTime_GetDay());
     displayLine[2] = '/';
-    digit = 0;
-    while (month >= 10) {
-        month = (unsigned char)(month - 10);
-        digit++;
-    }
-    displayLine[3] = (char)('0' + digit);
-    displayLine[4] = (char)('0' + month);
+    Display_Put2Digits(3, SerialTime_GetMonth());
     displayLine[5] = '\0';
     Display_ShowText(Farm_GetName(), displayLine);
 }

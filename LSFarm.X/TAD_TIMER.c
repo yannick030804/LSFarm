@@ -26,9 +26,6 @@ void RSI_Timer0 () {
 }
 
 void TI_Init () {
-    for (unsigned char counter = 0; counter < TI_NUMTIMERS; counter++) {
-        TimerStarts[counter] = 0;
-    }
     TimerBusyMask = 0;
     T0CON = T0CON_CONFIG;
     TMR0 = RECARREGA_TMR0;

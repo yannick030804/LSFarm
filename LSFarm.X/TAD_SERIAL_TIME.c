@@ -25,12 +25,11 @@ static const char *txPtr;
 
 static char rxChars[SERIAL_TIME_LINE_MAX];
 static unsigned char rxLen;
-static STDate currentDate;
-static unsigned char tempDay;
-static unsigned char tempMonth;
-static unsigned char tempHour;
-static unsigned char tempMinute;
-static unsigned char tempSecond;
+static unsigned char currentDay;
+static unsigned char currentMonth;
+static unsigned char currentHour;
+static unsigned char currentMinute;
+static unsigned char currentSecond;
 
 static unsigned char isDigit (char c) {
     if (c >= '0' && c <= '9') {
@@ -39,15 +38,51 @@ static unsigned char isDigit (char c) {
     return 0;
 }
 
-static void SerialTime_SetErrorMessage (void) {
-    txPtr = "\r\nPlease input a correct date\r\n";
-    rxLen = 0;
-}
-
 static unsigned char parseTwoDigits (unsigned char index) {
     unsigned char value = (unsigned char)(rxChars[index] - '0');
+    return (unsigned char)((unsigned char)((value << 3) + (value << 1)) + (unsigned char)(rxChars[index + 1] - '0'));
+}
 
-    return (unsigned char)((value << 3) + (value << 1) + (rxChars[index + 1] - '0'));
+static unsigned char SerialTime_ParseLine (void) {
+    unsigned char day;
+    unsigned char month;
+    unsigned char hour;
+    unsigned char minute;
+    unsigned char second;
+
+    if (rxLen != SERIAL_TIME_LINE_MAX) {
+        return 0;
+    }
+
+    if (rxChars[2] != '/' || rxChars[5] != ' ' || rxChars[8] != ':' || rxChars[11] != ':') {
+        return 0;
+    }
+
+    if (isDigit(rxChars[0]) == 0 || isDigit(rxChars[1]) == 0 ||
+        isDigit(rxChars[3]) == 0 || isDigit(rxChars[4]) == 0 ||
+        isDigit(rxChars[6]) == 0 || isDigit(rxChars[7]) == 0 ||
+        isDigit(rxChars[9]) == 0 || isDigit(rxChars[10]) == 0 ||
+        isDigit(rxChars[12]) == 0 || isDigit(rxChars[13]) == 0) {
+        return 0;
+    }
+
+    day = parseTwoDigits(0);
+    month = parseTwoDigits(3);
+    hour = parseTwoDigits(6);
+    minute = parseTwoDigits(9);
+    second = parseTwoDigits(12);
+
+    if (day < 1 || day > 31 || month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) {
+        return 0;
+    }
+
+    currentDay = day;
+    currentMonth = month;
+    currentHour = hour;
+    currentMinute = minute;
+    currentSecond = second;
+    stFlags |= ST_FLAG_TIME_CONFIGURED;
+    return 1;
 }
 
 static unsigned char getRxBitIdx (void) {
@@ -134,11 +169,11 @@ void SerialTime_Init (void) {
 
     rxLen = 0;
 
-    currentDate.day = 0;
-    currentDate.month = 0;
-    currentDate.hour = 0;
-    currentDate.minute = 0;
-    currentDate.second = 0;
+    currentDay = 0;
+    currentMonth = 0;
+    currentHour = 0;
+    currentMinute = 0;
+    currentSecond = 0;
 
     INTCON2bits.INTEDG2 = 0;
     INTCON3bits.INT2IF = 0;
@@ -171,129 +206,33 @@ void motorSerialTime (void) {
             }
             break;
         case 1:
-            tempDay = 0;
-            tempMonth = 0;
-            tempHour = 0;
-            tempMinute = 0;
-            tempSecond = 0;
-            if (rxLen == SERIAL_TIME_LINE_MAX) {
-                state++;
-            } else {
-                SerialTime_SetErrorMessage();
-                state = 0;
-            }
-            break;
-        case 2:
-            if (isDigit(rxChars[0]) && isDigit(rxChars[1])) {
-                tempDay = parseTwoDigits(0);
-                state++;
-            } else {
-                SerialTime_SetErrorMessage();
-                state = 0;
-            }
-            break;
-        case 3:
-            if (rxChars[2] == '/') {
-                state++;
-            } else {
-                SerialTime_SetErrorMessage();
-                state = 0;
-            }
-            break;
-        case 4:
-            if (isDigit(rxChars[3]) && isDigit(rxChars[4])) {
-                tempMonth = parseTwoDigits(3);
-                state++;
-            } else {
-                SerialTime_SetErrorMessage();
-                state = 0;
-            }
-            break;
-        case 5:
-            if (rxChars[5] == ' ') {
-                state++;
-            } else {
-                SerialTime_SetErrorMessage();
-                state = 0;
-            }
-            break;
-        case 6:
-            if (isDigit(rxChars[6]) && isDigit(rxChars[7])) {
-                tempHour = parseTwoDigits(6);
-                state++;
-            } else {
-                SerialTime_SetErrorMessage();
-                state = 0;
-            }
-            break;
-        case 7:
-            if (rxChars[8] == ':') {
-                state++;
-            } else {
-                SerialTime_SetErrorMessage();
-                state = 0;
-            }
-            break;
-        case 8:
-            if (isDigit(rxChars[9]) && isDigit(rxChars[10])) {
-                tempMinute = parseTwoDigits(9);
-                state++;
-            } else {
-                SerialTime_SetErrorMessage();
-                state = 0;
-            }
-            break;
-        case 9:
-            if (rxChars[11] == ':') {
-                state++;
-            } else {
-                SerialTime_SetErrorMessage();
-                state = 0;
-            }
-            break;
-        case 10:
-            if (isDigit(rxChars[12]) && isDigit(rxChars[13])) {
-                tempSecond = parseTwoDigits(12);
-                state++;
-            } else {
-                SerialTime_SetErrorMessage();
-                state = 0;
-            }
-            break;
-        case 11:
-            if (tempDay >= 1 && tempDay <= 31 && tempMonth >= 1 && tempMonth <= 12 && tempHour <= 23 && tempMinute <= 59 && tempSecond <= 59) {
-                currentDate.day = tempDay;
-                currentDate.month = tempMonth;
-                currentDate.hour = tempHour;
-                currentDate.minute = tempMinute;
-                currentDate.second = tempSecond;
-                stFlags |= ST_FLAG_TIME_CONFIGURED;
+            if (SerialTime_ParseLine() == 1) {
                 txPtr = "\r\nDate and time correct\r\n";
             } else {
-                SerialTime_SetErrorMessage();
+                txPtr = "\r\nPlease input a correct date\r\n";
             }
             rxLen = 0;
-            state++;
+            state = 2;
             TI_ResetTics(timerHandle);
             break;
-        case 12:
+        case 2:
             if (TI_GetTics(timerHandle) >= 1000) {
                 TI_ResetTics(timerHandle);
-                currentDate.second++;
-                if (currentDate.second > 59) {
-                    currentDate.second = 0;
-                    currentDate.minute++;
-                    if (currentDate.minute > 59) {
-                        currentDate.minute = 0;
-                        currentDate.hour++;
-                        if (currentDate.hour > 23) {
-                            currentDate.hour = 0;
-                            currentDate.day++;
-                            if (currentDate.day > 31) {
-                                currentDate.day = 1;
-                                currentDate.month++;
-                                if (currentDate.month > 12) {
-                                    currentDate.month = 1;
+                currentSecond++;
+                if (currentSecond > 59) {
+                    currentSecond = 0;
+                    currentMinute++;
+                    if (currentMinute > 59) {
+                        currentMinute = 0;
+                        currentHour++;
+                        if (currentHour > 23) {
+                            currentHour = 0;
+                            currentDay++;
+                            if (currentDay > 31) {
+                                currentDay = 1;
+                                currentMonth++;
+                                if (currentMonth > 12) {
+                                    currentMonth = 1;
                                 }
                             }
                         }
@@ -356,21 +295,21 @@ unsigned char SerialTime_IsConfigured (void) {
 }
 
 unsigned char SerialTime_GetDay (void) {
-    return currentDate.day;
+    return currentDay;
 }
 
 unsigned char SerialTime_GetMonth (void) {
-    return currentDate.month;
+    return currentMonth;
 }
 
 unsigned char SerialTime_GetHour (void) {
-    return currentDate.hour;
+    return currentHour;
 }
 
 unsigned char SerialTime_GetMinute (void) {
-    return currentDate.minute;
+    return currentMinute;
 }
 
 unsigned char SerialTime_GetSecond (void) {
-    return currentDate.second;
+    return currentSecond;
 }

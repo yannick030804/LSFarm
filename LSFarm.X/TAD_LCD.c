@@ -12,16 +12,6 @@ static unsigned char cursor;
 static unsigned char scan;
 static unsigned char timerHandle;
 
-static void CantaPartAlta(char c)
-{
-    LATD = (LATD & 0xC3) | ((c >> 2) & 0x3C);
-}
-
-static void CantaPartBaixa(char c)
-{
-    LATD = (LATD & 0xC3) | ((c << 2) & 0x3C);
-}
-
 static void LCD_SendByte(char value, unsigned char isData)
 {
     if (isData == 1) {
@@ -30,10 +20,10 @@ static void LCD_SendByte(char value, unsigned char isData)
         RSDown();
     }
     EnableUp();
-    CantaPartAlta(value);
+    LATD = (LATD & 0xC3) | ((value >> 2) & 0x3C);
     EnableDown();
     EnableUp();
-    CantaPartBaixa(value);
+    LATD = (LATD & 0xC3) | ((value << 2) & 0x3C);
     EnableDown();
 }
 
@@ -115,7 +105,7 @@ void motorLCD (void) {
         case 1:
             LCD_SendByte(frame[scan], 1);
             scan++;
-            if (scan >= 16) {
+            if (scan == 16) {
                 state++;
             }
             break;
@@ -126,7 +116,7 @@ void motorLCD (void) {
         case 3:
             LCD_SendByte(frame[scan], 1);
             scan++;
-            if (scan >= 32) {
+            if (scan == 32) {
                 state = 0;
             }
             break;

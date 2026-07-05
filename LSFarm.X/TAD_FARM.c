@@ -77,7 +77,6 @@ static void Farm_RecountAnimals (void);
 static void Farm_MarkDirty (void);
 static void Farm_PushNotification (unsigned char kind, unsigned char species, unsigned char number);
 static unsigned char Farm_CreateAnimal (unsigned char species);
-static unsigned char Farm_GetAwakeCount (unsigned char species);
 static void Farm_TakeProduct (unsigned char species, unsigned char amount);
 static void Farm_ProcessGeneration (unsigned char species, unsigned char now);
 static void Farm_ProcessProducts (unsigned char species, unsigned char now);
@@ -634,10 +633,6 @@ static unsigned char Farm_CreateAnimal (unsigned char species) {
     return 1;
 }
 
-static unsigned char Farm_GetAwakeCount (unsigned char species) {
-    return (unsigned char)(ANIMAL_COUNT(species) - CRITICAL_COUNT(species));
-}
-
 static void Farm_TakeProduct (unsigned char species, unsigned char amount) {
     if (PRODUCT_COUNT(species) >= amount) {
         PRODUCT_COUNT(species) = (unsigned char)(PRODUCT_COUNT(species) - amount);
@@ -661,6 +656,7 @@ static void Farm_ProcessGeneration (unsigned char species, unsigned char now) {
 
 static void Farm_ProcessProducts (unsigned char species, unsigned char now) {
     unsigned char awakeCount;
+    unsigned char totalProducts;
 
     if (rebellion == 1) {
         return;
@@ -670,12 +666,13 @@ static void Farm_ProcessProducts (unsigned char species, unsigned char now) {
         return;
     }
 
-    awakeCount = Farm_GetAwakeCount(species);
+    awakeCount = (unsigned char)(ANIMAL_COUNT(species) - CRITICAL_COUNT(species));
     if (awakeCount > 0) {
-        if ((unsigned int)PRODUCT_COUNT(species) + awakeCount > 255) {
+        totalProducts = PRODUCT_COUNT(species);
+        if (awakeCount > (unsigned char)(255 - totalProducts)) {
             PRODUCT_COUNT(species) = 255;
         } else {
-            PRODUCT_COUNT(species) = (unsigned char)(PRODUCT_COUNT(species) + awakeCount);
+            PRODUCT_COUNT(species) = (unsigned char)(totalProducts + awakeCount);
         }
         Farm_PushNotification(FARM_NOTIFICATION_PRODUCT, species, PRODUCT_COUNT(species));
         Farm_MarkDirty();
