@@ -11,8 +11,7 @@ static unsigned char timerHandle;
 
 static volatile unsigned char rxByte;
 static volatile unsigned char stFlags;
-static volatile unsigned char rxBitIdx;
-static volatile unsigned char txBitIdx;
+static volatile unsigned char bitIdxPair;
 static volatile unsigned char rxShift;
 static volatile unsigned char rxPos;
 static volatile unsigned char rxNext;
@@ -86,8 +85,25 @@ static unsigned char SerialTime_ParseLine (void) {
     return 1;
 }
 
+static unsigned char getRxBitIdx (void) {
+    return (unsigned char)(bitIdxPair & 0x0F);
+}
+
+static void setRxBitIdx (unsigned char value) {
+    bitIdxPair = (unsigned char)((bitIdxPair & 0xF0) | (value & 0x0F));
+}
+
+static unsigned char getTxBitIdx (void) {
+    return (unsigned char)((bitIdxPair >> 4) & 0x0F);
+}
+
+static void setTxBitIdx (unsigned char value) {
+    bitIdxPair = (unsigned char)((bitIdxPair & 0x0F) | ((value & 0x0F) << 4));
+}
+
 static void txTick (void) {
     unsigned char b;
+    unsigned char txBitIdx;
 
     if ((stFlags & ST_FLAG_TX_ACTIVE) == 0) {
         b = 0;
@@ -106,7 +122,7 @@ static void txTick (void) {
 
         if (b != 0) {
             txShift = b;
-            txBitIdx = 0;
+            setTxBitIdx(0);
             txPos = 0;
             txNext = 3;
             stFlags |= ST_FLAG_TX_ACTIVE;
@@ -120,6 +136,7 @@ static void txTick (void) {
     }
     txNext = (unsigned char)(txNext + 10);
 
+    txBitIdx = getTxBitIdx();
     if (txBitIdx == 0) {
         LATBbits.LATB1 = 0;
     } else if (txBitIdx <= 8) {
@@ -132,7 +149,7 @@ static void txTick (void) {
         return;
     }
 
-    txBitIdx++;
+    setTxBitIdx((unsigned char)(txBitIdx + 1));
 }
 
 void SerialTime_Init (void) {
@@ -209,13 +226,15 @@ void motorSerialTime (void) {
 void SerialTime_StartBitISR (void) {
     INTCON3bits.INT2IE = 0;
     rxShift = 0;
-    rxBitIdx = 0;
+    setRxBitIdx(0);
     rxPos = 0;
     rxNext = 15;
     stFlags |= ST_FLAG_RX_ACTIVE;
 }
 
 void SerialTime_TickISR (void) {
+    unsigned char rxBitIdx;
+
     if ((stFlags & ST_FLAG_RX_ACTIVE) == 0) {
         txTick();
         return;
@@ -228,12 +247,13 @@ void SerialTime_TickISR (void) {
     }
     rxNext = (unsigned char)(rxNext + 10);
 
+    rxBitIdx = getRxBitIdx();
     if (rxBitIdx < 8) {
         rxShift >>= 1;
         if (PORTBbits.RB2) {
             rxShift |= 0x80;
         }
-        rxBitIdx++;
+        setRxBitIdx((unsigned char)(rxBitIdx + 1));
     } else {
         if (PORTBbits.RB2) {
             rxByte = rxShift;
