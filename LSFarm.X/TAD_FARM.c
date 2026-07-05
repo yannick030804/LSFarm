@@ -17,6 +17,7 @@
 #define ANIMAL_SPECIES_MASK 0x03
 #define ANIMAL_CRITICAL_MASK 0x80
 #define YEAR_SECONDS 31536000UL
+#define FARM_NOTIFICATION_MASK (FARM_NOTIFICATION_QUEUE_SIZE - 1)
 #define PENDING_TIME(species) pendingTimes[(species)]
 #define GENERATION_TIME(species) generationTimes[(species)]
 #define ANIMAL_COUNT(species) animalCounts[(species)]
@@ -33,11 +34,7 @@ static unsigned char rebellion;
 static unsigned char resetRequested;
 static unsigned char dirtyState;
 static unsigned char currentDateValid;
-static unsigned char currentDay;
-static unsigned char currentMonth;
-static unsigned char currentHour;
-static unsigned char currentMinute;
-static unsigned char currentSecond;
+static unsigned long currentStamp;
 
 static char farmName[FARM_MAX_NAME + 1];
 static const char *pendingName;
@@ -360,21 +357,18 @@ unsigned char Farm_GetNotification (FarmNotification *notification) {
     notification->kind = (unsigned char)(notificationMeta[notificationHead] >> 2);
     notification->species = (unsigned char)(notificationMeta[notificationHead] & 0x03);
     notification->number = notificationValues[notificationHead];
-    notificationHead++;
-    if (notificationHead >= FARM_NOTIFICATION_QUEUE_SIZE) {
-        notificationHead = 0;
-    }
+    notificationHead = (unsigned char)((notificationHead + 1) & FARM_NOTIFICATION_MASK);
     notificationCount--;
     return 1;
 }
 
 void Farm_SetCurrentDate (unsigned char valid, unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second) {
     currentDateValid = valid;
-    currentDay = day;
-    currentMonth = month;
-    currentHour = hour;
-    currentMinute = minute;
-    currentSecond = second;
+    if (valid == 1) {
+        currentStamp = Farm_BuildDateSeconds(day, month, hour, minute, second);
+    } else {
+        currentStamp = 0;
+    }
 }
 
 unsigned char Farm_ExportByte (unsigned char index) {
@@ -467,11 +461,7 @@ static void resetFarmData (void) {
     resetRequested = 0;
     dirtyState = 0;
     currentDateValid = 0;
-    currentDay = 0;
-    currentMonth = 0;
-    currentHour = 0;
-    currentMinute = 0;
-    currentSecond = 0;
+    currentStamp = 0;
     farmName[0] = '\0';
     pendingName = 0;
     configRequested = 0;
@@ -524,10 +514,7 @@ static void Farm_PushNotification (unsigned char kind, unsigned char species, un
         return;
     }
 
-    tail = (unsigned char)(notificationHead + notificationCount);
-    if (tail >= FARM_NOTIFICATION_QUEUE_SIZE) {
-        tail = (unsigned char)(tail - FARM_NOTIFICATION_QUEUE_SIZE);
-    }
+    tail = (unsigned char)((notificationHead + notificationCount) & FARM_NOTIFICATION_MASK);
 
     notificationMeta[tail] = (unsigned char)(((kind & 0x3F) << 2) | (species & 0x03));
     notificationValues[tail] = number;
@@ -714,21 +701,19 @@ static unsigned char Farm_GetNowSeconds (void) {
 }
 
 static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index) {
-    unsigned long currentTotal;
     unsigned long sleepTotal;
 
-    currentTotal = Farm_BuildDateSeconds(currentDay, currentMonth, currentHour, currentMinute, currentSecond);
     sleepTotal = animalSleepStamp[index];
 
-    if (currentTotal >= sleepTotal) {
-        return currentTotal - sleepTotal;
+    if (currentStamp >= sleepTotal) {
+        return currentStamp - sleepTotal;
     }
 
-    return (YEAR_SECONDS - sleepTotal) + currentTotal;
+    return (YEAR_SECONDS - sleepTotal) + currentStamp;
 }
 
 static void Farm_StoreSleepDate (unsigned char index) {
-    animalSleepStamp[index] = Farm_BuildDateSeconds(currentDay, currentMonth, currentHour, currentMinute, currentSecond);
+    animalSleepStamp[index] = currentStamp;
 }
 
 static void Farm_SetAnimalSpecies (unsigned char index, unsigned char species) {
@@ -760,6 +745,7 @@ static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes) {
 
 static unsigned char Farm_ExportAnimalByte (unsigned char index) {
     unsigned char animalIndex = 0;
+    unsigned char *stampBytes;
 
     while (index >= 5) {
         index = (unsigned char)(index - 5);
@@ -773,20 +759,14 @@ static unsigned char Farm_ExportAnimalByte (unsigned char index) {
     if (index == 0) {
         return animalInfo[animalIndex];
     }
-    if (index == 1) {
-        return (unsigned char)animalSleepStamp[animalIndex];
-    }
-    if (index == 2) {
-        return (unsigned char)(animalSleepStamp[animalIndex] >> 8);
-    }
-    if (index == 3) {
-        return (unsigned char)(animalSleepStamp[animalIndex] >> 16);
-    }
-    return (unsigned char)(animalSleepStamp[animalIndex] >> 24);
+
+    stampBytes = (unsigned char *)&animalSleepStamp[animalIndex];
+    return stampBytes[index - 1];
 }
 
 static void Farm_ImportAnimalByte (unsigned char index, unsigned char value) {
     unsigned char animalIndex = 0;
+    unsigned char *stampBytes;
 
     while (index >= 5) {
         index = (unsigned char)(index - 5);
@@ -801,17 +781,7 @@ static void Farm_ImportAnimalByte (unsigned char index, unsigned char value) {
         animalInfo[animalIndex] = value;
         return;
     }
-    if (index == 1) {
-        animalSleepStamp[animalIndex] &= 0xFFFFFF00UL;
-        animalSleepStamp[animalIndex] |= (unsigned long)value;
-    } else if (index == 2) {
-        animalSleepStamp[animalIndex] &= 0xFFFF00FFUL;
-        animalSleepStamp[animalIndex] |= ((unsigned long)value << 8);
-    } else if (index == 3) {
-        animalSleepStamp[animalIndex] &= 0xFF00FFFFUL;
-        animalSleepStamp[animalIndex] |= ((unsigned long)value << 16);
-    } else {
-        animalSleepStamp[animalIndex] &= 0x00FFFFFFUL;
-        animalSleepStamp[animalIndex] |= ((unsigned long)value << 24);
-    }
+
+    stampBytes = (unsigned char *)&animalSleepStamp[animalIndex];
+    stampBytes[index - 1] = value;
 }
