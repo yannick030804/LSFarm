@@ -2,7 +2,6 @@
 #include "TAD_EEPROM.h"
 
 static unsigned char mode;
-static unsigned char clearIndex;
 
 static void launchWrite (void) {
     EECON1bits.EEPGD = 0;
@@ -25,17 +24,9 @@ void motorEEPROM (void) {
         return;
     }
 
-    if (mode == 2) {
-        EEADR = clearIndex;
-        EEDATA = 0;
+    if (mode == 1) {
         launchWrite();
-        clearIndex++;
-        if (clearIndex == 0) {
-            mode = 3;
-        }
-    } else if (mode == 1) {
-        launchWrite();
-        mode = 3;
+        mode = 2;
     } else {
         EECON1bits.WREN = 0;
         mode = 0;
@@ -59,15 +50,6 @@ unsigned char EEPROM_StartByteWrite (unsigned char addr, unsigned char data) {
     EEDATA = data;
     mode = 1;
     return 1;
-}
-
-void EEPROM_RequestClear (void) {
-    if (mode != 0) {
-        return;
-    }
-
-    clearIndex = 0;
-    mode = 2;
 }
 
 unsigned char EEPROM_IsBusy (void) {

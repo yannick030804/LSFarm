@@ -1,5 +1,6 @@
 #include <xc.h>
 #include "TAD_FARM.h"
+#include "TAD_EEPROM.h"
 #include "TAD_TIMER.h"
 
 #define FARM_MAX_NAME 16
@@ -18,6 +19,9 @@
 #define ANIMAL_CRITICAL_MASK 0x80
 #define YEAR_SECONDS 31536000UL
 #define FARM_NOTIFICATION_MASK (FARM_NOTIFICATION_QUEUE_SIZE - 1)
+#define FARM_EEPROM_MODE_CLEAR 1
+#define FARM_EEPROM_MODE_SAVE  2
+#define PENDING_TIME(species) pendingTimes[(species)]
 #define GENERATION_TIME(species) generationTimes[(species)]
 #define ANIMAL_COUNT(species) animalCounts[(species)]
 #define CRITICAL_COUNT(species) criticalCounts[(species)]
@@ -28,33 +32,34 @@
 #define ANIMAL_IS_CRITICAL(index) ((unsigned char)((animalInfo[(index)] & ANIMAL_CRITICAL_MASK) != 0))
 
 static unsigned char timerHandle;
-unsigned char configured;
-unsigned char farmRebellion;
+static unsigned char configured;
+static unsigned char rebellion;
 static unsigned char resetRequested;
-unsigned char dirtyState;
+static unsigned char dirtyState;
 static unsigned char currentDateValid;
 static unsigned long currentStamp;
 
-char farmName[FARM_MAX_NAME + 1];
+static char farmName[FARM_MAX_NAME + 1];
 static const char *pendingName;
+static unsigned char pendingTimes[FARM_NUM_SPECIES];
 static unsigned char configRequested;
 
 static unsigned char generationTimes[FARM_NUM_SPECIES];
 static unsigned char animalCounts[FARM_NUM_SPECIES];
 static unsigned char criticalCounts[FARM_NUM_SPECIES];
-unsigned char productCounts[FARM_NUM_SPECIES];
+static unsigned char productCounts[FARM_NUM_SPECIES];
 
-unsigned char totalAnimals;
+static unsigned char totalAnimals;
 
 static unsigned char selectedAnimalSpecies;
 static unsigned char selectedAnimalNumber;
 static signed char selectedAnimalIndex;
 static unsigned char searchRequested;
-unsigned char searchFinished;
-unsigned char searchFound;
-unsigned char restRequestPending;
-unsigned char restFinished;
-unsigned char restSuccess;
+static unsigned char searchFinished;
+static unsigned char searchFound;
+static unsigned char restRequestPending;
+static unsigned char restFinished;
+static unsigned char restSuccess;
 
 static unsigned char lastGeneration[FARM_NUM_SPECIES];
 static unsigned char lastProduct[FARM_NUM_SPECIES];
@@ -65,14 +70,14 @@ static unsigned char notificationMeta[FARM_NOTIFICATION_QUEUE_SIZE];
 static unsigned char notificationValues[FARM_NOTIFICATION_QUEUE_SIZE];
 static unsigned char notificationHead;
 static unsigned char notificationCount;
-static unsigned char farmState;
-static unsigned char farmCopyIndex;
-static unsigned char farmSpeciesIndex;
-static unsigned char farmAnimalIndex;
-static unsigned char farmSpeciesNumber;
-static unsigned char farmNow;
+static unsigned char eepromMode;
+static unsigned char eepromRecord;
+static unsigned char eepromField;
+static unsigned char eepromAddr;
 
 static void resetFarmData (void);
+static void Farm_LoadFromEEPROM (void);
+static void Farm_ServiceEEPROM (void);
 static void Farm_ClearCurrentData (void);
 static void Farm_RecountAnimals (void);
 static void Farm_PushNotification (unsigned char kind, unsigned char species, unsigned char number);
@@ -82,153 +87,138 @@ static void Farm_ProcessGeneration (unsigned char species, unsigned char now);
 static void Farm_ProcessProducts (unsigned char species, unsigned char now);
 static void Farm_ProcessCriticalAnimal (unsigned char index);
 static void Farm_ResetSelectionState (void);
-static unsigned int Farm_GetMonthOffset (unsigned char month);
-static unsigned long Farm_BuildClockSeconds (unsigned char hour, unsigned char minute, unsigned char second);
-static unsigned long Farm_BuildDaySeconds (unsigned int dayOffset);
 static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second);
+static unsigned char Farm_GetNowSeconds (void);
 static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index);
 static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes);
-static unsigned char Farm_ExportAnimalByte (unsigned char index);
-static void Farm_ImportAnimalByte (unsigned char index, unsigned char value);
+static unsigned char Farm_GetAnimalRecordByte (unsigned char index, unsigned char field);
 
 void Farm_Init (void) {
     TI_NewTimer(&timerHandle);
     resetFarmData();
+    Farm_LoadFromEEPROM();
     TI_ResetTics(timerHandle);
-}
-
-static void Farm_StateWaitConfig (void) {
-    if (configRequested == 1) {
-        farmCopyIndex = 0;
-        farmState++;
-    }
-}
-
-static void Farm_StateCopyName (void) {
-    if (pendingName[farmCopyIndex] != '\0' && farmCopyIndex < sizeof(farmName) - 1) {
-        farmName[farmCopyIndex] = pendingName[farmCopyIndex];
-        farmCopyIndex++;
-    } else {
-        farmName[farmCopyIndex] = '\0';
-        farmState++;
-    }
-}
-
-static void Farm_StateFinishConfig (void) {
-    Farm_ClearCurrentData();
-    configured = 1;
-    configRequested = 0;
-    dirtyState = 1;
-    farmNow = 0;
-    TI_ResetTics(timerHandle);
-    farmState++;
-}
-
-static void Farm_StateTick (void) {
-    if (configured == 0) {
-        return;
-    }
-    if (TI_GetTics(timerHandle) >= 1000UL) {
-        TI_ResetTics(timerHandle);
-        farmNow++;
-    }
-    if (currentDateValid == 0) {
-        return;
-    }
-    farmSpeciesIndex = 0;
-    farmState++;
-}
-
-static void Farm_StateGenerateAnimals (void) {
-    if (farmSpeciesIndex < FARM_NUM_SPECIES) {
-        Farm_ProcessGeneration(farmSpeciesIndex, farmNow);
-        farmSpeciesIndex++;
-    } else {
-        farmSpeciesIndex = 0;
-        farmState++;
-    }
-}
-
-static void Farm_StateGenerateProducts (void) {
-    if (farmSpeciesIndex < FARM_NUM_SPECIES) {
-        Farm_ProcessProducts(farmSpeciesIndex, farmNow);
-        farmSpeciesIndex++;
-    } else {
-        farmAnimalIndex = 0;
-        farmState++;
-    }
-}
-
-static void Farm_StateCriticalAnimals (void) {
-    if (farmAnimalIndex < totalAnimals) {
-        Farm_ProcessCriticalAnimal(farmAnimalIndex);
-        farmAnimalIndex++;
-    } else if (searchRequested == 1) {
-        farmAnimalIndex = 0;
-        farmSpeciesNumber = 0;
-        searchFinished = 0;
-        searchFound = 0;
-        selectedAnimalIndex = -1;
-        farmState++;
-    } else {
-        farmState = 3;
-    }
-}
-
-static void Farm_StateSearchAnimal (void) {
-    if (farmAnimalIndex < totalAnimals) {
-        if (ANIMAL_SPECIES(farmAnimalIndex) == selectedAnimalSpecies) {
-            farmSpeciesNumber++;
-        }
-        if (ANIMAL_SPECIES(farmAnimalIndex) == selectedAnimalSpecies && farmSpeciesNumber == selectedAnimalNumber) {
-            selectedAnimalIndex = (signed char)farmAnimalIndex;
-            searchFound = 1;
-            searchFinished = 1;
-            restRequestPending = 1;
-            restFinished = 0;
-            restSuccess = 0;
-            searchRequested = 0;
-            farmState = 3;
-        } else {
-            farmAnimalIndex++;
-        }
-    } else {
-        searchFinished = 1;
-        searchRequested = 0;
-        farmState = 3;
-    }
 }
 
 void motorFarm (void) {
+    static unsigned char state = 0;
+    static unsigned char copyIndex = 0;
+    static unsigned char speciesIndex = 0;
+    static unsigned char animalIndex = 0;
+    static unsigned char speciesNumber = 0;
+    static unsigned char now = 0;
+
+    Farm_ServiceEEPROM();
+
     if (resetRequested == 1) {
-        farmState = 0;
+        state = 0;
+        copyIndex = 0;
+        speciesIndex = 0;
+        animalIndex = 0;
+        speciesNumber = 0;
+        now = 0;
         resetRequested = 0;
     }
 
-    switch (farmState) {
+    switch (state) {
         case 0:
-            Farm_StateWaitConfig();
+            if (configRequested == 1) {
+                copyIndex = 0;
+                state++;
+            }
             break;
+
         case 1:
-            Farm_StateCopyName();
+            if (pendingName[copyIndex] != '\0' && copyIndex < sizeof(farmName) - 1) {
+                farmName[copyIndex] = pendingName[copyIndex];
+                copyIndex++;
+            } else {
+                farmName[copyIndex] = '\0';
+                state++;
+            }
             break;
+
         case 2:
-            Farm_StateFinishConfig();
+            Farm_ClearCurrentData();
+            GENERATION_TIME(SPECIES_COW) = PENDING_TIME(SPECIES_COW);
+            GENERATION_TIME(SPECIES_PIG) = PENDING_TIME(SPECIES_PIG);
+            GENERATION_TIME(SPECIES_HORSE) = PENDING_TIME(SPECIES_HORSE);
+            GENERATION_TIME(SPECIES_CHICKEN) = PENDING_TIME(SPECIES_CHICKEN);
+            configured = 1;
+            configRequested = 0;
+            dirtyState = 0;
+            TI_ResetTics(timerHandle);
+            state++;
             break;
+
         case 3:
-            Farm_StateTick();
+            if (configured == 0 || currentDateValid == 0) {
+                break;
+            }
+            speciesIndex = 0;
+            state++;
             break;
+
         case 4:
-            Farm_StateGenerateAnimals();
+            now = Farm_GetNowSeconds();
+            if (speciesIndex < FARM_NUM_SPECIES) {
+                Farm_ProcessGeneration(speciesIndex, now);
+                speciesIndex++;
+            } else {
+                speciesIndex = 0;
+                state++;
+            }
             break;
+
         case 5:
-            Farm_StateGenerateProducts();
+            now = Farm_GetNowSeconds();
+            if (speciesIndex < FARM_NUM_SPECIES) {
+                Farm_ProcessProducts(speciesIndex, now);
+                speciesIndex++;
+            } else {
+                animalIndex = 0;
+                state++;
+            }
             break;
+
         case 6:
-            Farm_StateCriticalAnimals();
+            if (animalIndex < totalAnimals) {
+                Farm_ProcessCriticalAnimal(animalIndex);
+                animalIndex++;
+            } else if (searchRequested == 1) {
+                animalIndex = 0;
+                speciesNumber = 0;
+                searchFinished = 0;
+                searchFound = 0;
+                selectedAnimalIndex = -1;
+                state++;
+            } else {
+                state = 3;
+            }
             break;
+
         case 7:
-            Farm_StateSearchAnimal();
+            if (animalIndex < totalAnimals) {
+                if (ANIMAL_SPECIES(animalIndex) == selectedAnimalSpecies) {
+                    speciesNumber++;
+                }
+                if (ANIMAL_SPECIES(animalIndex) == selectedAnimalSpecies && speciesNumber == selectedAnimalNumber) {
+                    selectedAnimalIndex = (signed char)animalIndex;
+                    searchFound = 1;
+                    searchFinished = 1;
+                    restRequestPending = 1;
+                    restFinished = 0;
+                    restSuccess = 0;
+                    searchRequested = 0;
+                    state = 3;
+                } else {
+                    animalIndex++;
+                }
+            } else {
+                searchFinished = 1;
+                searchRequested = 0;
+                state = 3;
+            }
             break;
     }
 }
@@ -237,14 +227,15 @@ void Farm_Reset (void) {
     resetFarmData();
     TI_ResetTics(timerHandle);
     resetRequested = 1;
+    eepromMode = FARM_EEPROM_MODE_CLEAR;
 }
 
 void Farm_RequestConfigure (const char *name, unsigned char cow, unsigned char horse, unsigned char pig, unsigned char chicken) {
     pendingName = name;
-    GENERATION_TIME(SPECIES_COW) = cow;
-    GENERATION_TIME(SPECIES_HORSE) = horse;
-    GENERATION_TIME(SPECIES_PIG) = pig;
-    GENERATION_TIME(SPECIES_CHICKEN) = chicken;
+    PENDING_TIME(SPECIES_COW) = cow;
+    PENDING_TIME(SPECIES_HORSE) = horse;
+    PENDING_TIME(SPECIES_PIG) = pig;
+    PENDING_TIME(SPECIES_CHICKEN) = chicken;
     Farm_ResetSelectionState();
     configRequested = 1;
     configured = 0;
@@ -254,7 +245,28 @@ void Farm_RequestSelectAnimal (unsigned char species, unsigned char number) {
     Farm_ResetSelectionState();
     selectedAnimalSpecies = species;
     selectedAnimalNumber = number;
+    selectedAnimalIndex = -1;
     searchRequested = 1;
+}
+
+unsigned char Farm_IsSearchFinished (void) {
+    return searchFinished;
+}
+
+unsigned char Farm_IsAnimalFound (void) {
+    return searchFound;
+}
+
+unsigned char Farm_IsRestRequestPending (void) {
+    return restRequestPending;
+}
+
+unsigned char Farm_IsRestFinished (void) {
+    return restFinished;
+}
+
+unsigned char Farm_IsRestSuccess (void) {
+    return restSuccess;
 }
 
 void Farm_NotifyRestSuccess (void) {
@@ -290,6 +302,18 @@ void Farm_NotifyRestTimeout (void) {
     restFinished = 1;
 }
 
+unsigned char Farm_IsConfigured (void) {
+    return configured;
+}
+
+const char *Farm_GetName (void) {
+    return farmName;
+}
+
+unsigned char Farm_GetAnimalCount (void) {
+    return totalAnimals;
+}
+
 void Farm_GetAnimal (unsigned char index, unsigned char *species, unsigned char *number, unsigned char *critical) {
     unsigned char i;
     unsigned char count = 0;
@@ -304,6 +328,14 @@ void Farm_GetAnimal (unsigned char index, unsigned char *species, unsigned char 
     }
 
     *number = count;
+}
+
+unsigned char Farm_GetProductTotal (unsigned char species) {
+    return PRODUCT_COUNT(species);
+}
+
+void Farm_SetRebellion (unsigned char active) {
+    rebellion = active;
 }
 
 void Farm_Consume (unsigned char recipe) {
@@ -322,7 +354,6 @@ void Farm_Consume (unsigned char recipe) {
             Farm_TakeProduct(SPECIES_HORSE, 2);
             break;
     }
-    dirtyState = 1;
 }
 
 unsigned char Farm_GetNotification (FarmNotification *notification) {
@@ -347,85 +378,9 @@ void Farm_SetCurrentDate (unsigned char valid, unsigned char day, unsigned char 
     }
 }
 
-unsigned char Farm_ExportByte (unsigned char index) {
-    if (index < (FARM_MAX_NAME + 1)) {
-        return (unsigned char)farmName[index];
-    }
-
-    index = (unsigned char)(index - (FARM_MAX_NAME + 1));
-    if (index < FARM_NUM_SPECIES) {
-        return GENERATION_TIME(index);
-    }
-
-    index = (unsigned char)(index - FARM_NUM_SPECIES);
-    if (index == 0) {
-        return totalAnimals;
-    }
-
-    index--;
-    if (index < FARM_NUM_SPECIES) {
-        return PRODUCT_COUNT(index);
-    }
-
-    index = (unsigned char)(index - FARM_NUM_SPECIES);
-    return Farm_ExportAnimalByte(index);
-}
-
-void Farm_BeginImportState (void) {
-    Farm_ClearCurrentData();
-}
-
-void Farm_ImportStateByte (unsigned char index, unsigned char value) {
-    if (index < (FARM_MAX_NAME + 1)) {
-        farmName[index] = (char)value;
-        return;
-    }
-
-    index = (unsigned char)(index - (FARM_MAX_NAME + 1));
-    if (index < FARM_NUM_SPECIES) {
-        GENERATION_TIME(index) = value;
-        return;
-    }
-
-    index = (unsigned char)(index - FARM_NUM_SPECIES);
-    if (index == 0) {
-        totalAnimals = value;
-        return;
-    }
-
-    index--;
-    if (index < FARM_NUM_SPECIES) {
-        PRODUCT_COUNT(index) = value;
-        return;
-    }
-
-    index = (unsigned char)(index - FARM_NUM_SPECIES);
-    Farm_ImportAnimalByte(index, value);
-}
-
-void Farm_EndImportState (void) {
-    unsigned char i;
-
-    if (totalAnimals > FARM_MAX_ANIMALS) {
-        totalAnimals = FARM_MAX_ANIMALS;
-    }
-
-    farmName[FARM_MAX_NAME] = '\0';
-    for (i = 0; i < totalAnimals; i++) {
-        if (ANIMAL_SPECIES(i) >= FARM_NUM_SPECIES) {
-            animalInfo[i] = (unsigned char)((animalInfo[i] & ANIMAL_CRITICAL_MASK) | SPECIES_COW);
-        }
-        animalInfo[i] &= (unsigned char)(~ANIMAL_CRITICAL_MASK);
-    }
-
-    Farm_RecountAnimals();
-    configured = 1;
-    dirtyState = 0;
-}
-
 static void resetFarmData (void) {
     configured = 0;
-    farmRebellion = 0;
+    rebellion = 0;
     resetRequested = 0;
     dirtyState = 0;
     currentDateValid = 0;
@@ -434,23 +389,97 @@ static void resetFarmData (void) {
     pendingName = 0;
     configRequested = 0;
     totalAnimals = 0;
-    farmState = 0;
-    farmNow = 0;
     notificationHead = 0;
     notificationCount = 0;
+    eepromMode = 0;
+    eepromRecord = 0;
+    eepromField = 0;
+    eepromAddr = 1;
     Farm_ResetSelectionState();
 
+    PENDING_TIME(SPECIES_COW) = 0;
+    PENDING_TIME(SPECIES_PIG) = 0;
+    PENDING_TIME(SPECIES_HORSE) = 0;
+    PENDING_TIME(SPECIES_CHICKEN) = 0;
     Farm_ClearSpeciesData(1);
 }
 
+static void Farm_LoadFromEEPROM (void) {
+    unsigned char count;
+    unsigned char i;
+    unsigned char field;
+    unsigned char addr = 1;
+    unsigned char *stampBytes;
+
+    count = EEPROM_ReadByte(0);
+    if (count > FARM_MAX_ANIMALS) {
+        return;
+    }
+
+    totalAnimals = count;
+    for (i = 0; i < totalAnimals; i++) {
+        animalInfo[i] = (unsigned char)(EEPROM_ReadByte(addr) & ANIMAL_SPECIES_MASK);
+        addr++;
+        stampBytes = (unsigned char *)&animalSleepStamp[i];
+        for (field = 0; field < 4; field++) {
+            stampBytes[field] = EEPROM_ReadByte(addr);
+            addr++;
+        }
+    }
+
+    Farm_RecountAnimals();
+    dirtyState = 0;
+}
+
+static void Farm_ServiceEEPROM (void) {
+    unsigned char data;
+
+    if (EEPROM_IsBusy() == 1) {
+        return;
+    }
+
+    if (eepromMode == FARM_EEPROM_MODE_CLEAR) {
+        if (EEPROM_StartByteWrite(0, 0) == 1) {
+            eepromMode = 0;
+            dirtyState = 0;
+        }
+        return;
+    }
+
+    if (eepromMode == 0) {
+        if (dirtyState == 0 || configured == 0) {
+            return;
+        }
+        eepromMode = FARM_EEPROM_MODE_SAVE;
+        eepromRecord = 0;
+        eepromField = 0;
+        eepromAddr = 1;
+    }
+
+    if (eepromRecord < totalAnimals) {
+        data = Farm_GetAnimalRecordByte(eepromRecord, eepromField);
+        if (EEPROM_StartByteWrite(eepromAddr, data) == 1) {
+            eepromAddr++;
+            eepromField++;
+            if (eepromField >= 5) {
+                eepromField = 0;
+                eepromRecord++;
+            }
+        }
+    } else if (EEPROM_StartByteWrite(0, totalAnimals) == 1) {
+        dirtyState = 0;
+        eepromMode = 0;
+    }
+}
+
 static void Farm_ClearCurrentData (void) {
-    totalAnimals = 0;
     notificationHead = 0;
     notificationCount = 0;
-    farmRebellion = 0;
+    rebellion = 0;
     dirtyState = 0;
     Farm_ResetSelectionState();
     Farm_ClearSpeciesData(0);
+    Farm_RecountAnimals();
 }
 
 static void Farm_RecountAnimals (void) {
@@ -537,7 +566,7 @@ static void Farm_ProcessProducts (unsigned char species, unsigned char now) {
     unsigned char totalProducts;
     unsigned char productTime;
 
-    if (farmRebellion == 1) {
+    if (rebellion == 1) {
         return;
     }
 
@@ -564,7 +593,6 @@ static void Farm_ProcessProducts (unsigned char species, unsigned char now) {
             PRODUCT_COUNT(species) = (unsigned char)(totalProducts + awakeCount);
         }
         Farm_PushNotification(FARM_NOTIFICATION_PRODUCT, species, PRODUCT_COUNT(species));
-        dirtyState = 1;
     }
     LAST_PRODUCT(species) = now;
 }
@@ -587,10 +615,11 @@ static void Farm_ProcessCriticalAnimal (unsigned char index) {
     species = ANIMAL_SPECIES(index);
     animalInfo[index] |= ANIMAL_CRITICAL_MASK;
     CRITICAL_COUNT(species)++;
-    dirtyState = 1;
 }
 
 static void Farm_ResetSelectionState (void) {
+    selectedAnimalSpecies = 0;
+    selectedAnimalNumber = 0;
     selectedAnimalIndex = -1;
     searchRequested = 0;
     searchFinished = 0;
@@ -600,8 +629,20 @@ static void Farm_ResetSelectionState (void) {
     restSuccess = 0;
 }
 
-static unsigned int Farm_GetMonthOffset (unsigned char month) {
+static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second) {
     unsigned int monthOffset = 0;
+    unsigned int dayOffset;
+    unsigned long total = second;
+
+    if (month == 0) {
+        month = 1;
+    }
+    if (day == 0) {
+        day = 1;
+    }
+    if (month > 12) {
+        month = 12;
+    }
 
     if (month > 1) monthOffset += 31;
     if (month > 2) monthOffset += 28;
@@ -614,11 +655,6 @@ static unsigned int Farm_GetMonthOffset (unsigned char month) {
     if (month > 9) monthOffset += 30;
     if (month > 10) monthOffset += 31;
     if (month > 11) monthOffset += 30;
-    return monthOffset;
-}
-
-static unsigned long Farm_BuildClockSeconds (unsigned char hour, unsigned char minute, unsigned char second) {
-    unsigned long total = second;
 
     while (minute > 0) {
         total += 60UL;
@@ -629,37 +665,26 @@ static unsigned long Farm_BuildClockSeconds (unsigned char hour, unsigned char m
         total += 3600UL;
         hour--;
     }
-    return total;
-}
 
-static unsigned long Farm_BuildDaySeconds (unsigned int dayOffset) {
-    unsigned long total = 0;
-
+    dayOffset = (unsigned int)(monthOffset + (unsigned int)(day - 1));
     while (dayOffset > 0) {
         total += 86400UL;
         dayOffset--;
     }
+
     return total;
 }
 
-static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second) {
-    unsigned int dayOffset;
-    unsigned long total;
+static unsigned char Farm_GetNowSeconds (void) {
+    unsigned long tics = TI_GetTics(timerHandle);
+    unsigned char seconds = 0;
 
-    if (month == 0) {
-        month = 1;
-    }
-    if (day == 0) {
-        day = 1;
-    }
-    if (month > 12) {
-        month = 12;
+    while (tics >= 1000UL) {
+        tics -= 1000UL;
+        seconds++;
     }
 
-    dayOffset = (unsigned int)(Farm_GetMonthOffset(month) + (unsigned int)(day - 1));
-    total = Farm_BuildClockSeconds(hour, minute, second);
-    total += Farm_BuildDaySeconds(dayOffset);
-    return total;
+    return seconds;
 }
 
 static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index) {
@@ -689,45 +714,17 @@ static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes) {
     }
 }
 
-static unsigned char Farm_ExportAnimalByte (unsigned char index) {
-    unsigned char animalIndex = 0;
+static unsigned char Farm_GetAnimalRecordByte (unsigned char index, unsigned char field) {
     unsigned char *stampBytes;
 
-    while (index >= 5) {
-        index = (unsigned char)(index - 5);
-        animalIndex++;
-    }
-
-    if (animalIndex >= FARM_MAX_ANIMALS || animalIndex >= totalAnimals) {
+    if (index >= FARM_MAX_ANIMALS || index >= totalAnimals) {
         return 0;
     }
 
-    if (index == 0) {
-        return animalInfo[animalIndex];
+    if (field == 0) {
+        return ANIMAL_SPECIES(index);
     }
 
-    stampBytes = (unsigned char *)&animalSleepStamp[animalIndex];
-    return stampBytes[index - 1];
-}
-
-static void Farm_ImportAnimalByte (unsigned char index, unsigned char value) {
-    unsigned char animalIndex = 0;
-    unsigned char *stampBytes;
-
-    while (index >= 5) {
-        index = (unsigned char)(index - 5);
-        animalIndex++;
-    }
-
-    if (animalIndex >= FARM_MAX_ANIMALS) {
-        return;
-    }
-
-    if (index == 0) {
-        animalInfo[animalIndex] = value;
-        return;
-    }
-
-    stampBytes = (unsigned char *)&animalSleepStamp[animalIndex];
-    stampBytes[index - 1] = value;
+    stampBytes = (unsigned char *)&animalSleepStamp[index];
+    return stampBytes[field - 1];
 }

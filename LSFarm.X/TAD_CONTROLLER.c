@@ -1,17 +1,11 @@
 #include <xc.h>
 #include "TAD_BUTTON.h"
 #include "TAD_CONTROLLER.h"
-#include "TAD_EEPROM.h"
 #include "TAD_FARM.h"
 #include "TAD_HEARTBEAT.h"
 #include "TAD_JOYSTICK.h"
 #include "TAD_SERIAL_JAVA.h"
 #include "TAD_SERIAL_TIME.h"
-
-#define FARM_STATE_MAGIC 0xA5
-#define CTRL_FLAG_PERSISTENCE_LOADED 0x01
-#define CTRL_FLAG_RESET_PENDING      0x02
-#define CTRL_FLAG_SAVE_ACTIVE        0x04
 
 #define REPLY_INIT_OK       0
 #define REPLY_INIT_ERROR    1
@@ -30,12 +24,8 @@
 #define REPLY_RIGHT         14
 
 static const char *txLine;
-static char controllerFarmName[17];
+static char farmName[17];
 static char txBuffer[21];
-static unsigned char controllerFlags;
-static unsigned char persistenceIndex;
-static unsigned char controllerState;
-static unsigned char controllerAnimalIndex;
 
 static unsigned char isDigit (char c) {
     if (c >= '0' && c <= '9') {
@@ -78,62 +68,35 @@ static void Controller_EndReply (unsigned char index) {
     txLine = txBuffer;
 }
 
-static unsigned char Controller_AddInit (unsigned char index) {
-    txBuffer[index++] = 'I';
-    txBuffer[index++] = 'N';
-    txBuffer[index++] = 'I';
-    txBuffer[index++] = 'T';
-    return index;
-}
-
-static unsigned char Controller_AddSleep (unsigned char index) {
-    txBuffer[index++] = 'S';
-    txBuffer[index++] = 'L';
-    txBuffer[index++] = 'E';
-    txBuffer[index++] = 'E';
-    txBuffer[index++] = 'P';
-    return index;
-}
-
-static unsigned char Controller_AddRebellion (unsigned char index) {
-    txBuffer[index++] = 'R';
-    txBuffer[index++] = 'E';
-    txBuffer[index++] = 'B';
-    txBuffer[index++] = 'E';
-    txBuffer[index++] = 'L';
-    txBuffer[index++] = 'L';
-    txBuffer[index++] = 'I';
-    txBuffer[index++] = 'O';
-    txBuffer[index++] = 'N';
-    return index;
-}
-
-static unsigned char Controller_AddConsume (unsigned char index) {
-    txBuffer[index++] = 'C';
-    txBuffer[index++] = 'O';
-    txBuffer[index++] = 'N';
-    txBuffer[index++] = 'S';
-    txBuffer[index++] = 'U';
-    txBuffer[index++] = 'M';
-    txBuffer[index++] = 'E';
-    return index;
-}
-
 static void Controller_SetReply (unsigned char reply) {
     unsigned char index = 0;
 
     switch (reply) {
         case REPLY_INIT_OK:
-            index = Controller_AddInit(index);
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'T';
             goto appendOk;
         case REPLY_INIT_ERROR:
-            index = Controller_AddInit(index);
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'T';
             goto appendError;
         case REPLY_SLEEP_OK:
-            index = Controller_AddSleep(index);
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'P';
             goto appendOk;
         case REPLY_SLEEP_ERROR:
-            index = Controller_AddSleep(index);
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'P';
             goto appendError;
         case REPLY_RESET_OK:
             txBuffer[index++] = 'R';
@@ -143,16 +106,44 @@ static void Controller_SetReply (unsigned char reply) {
             txBuffer[index++] = 'T';
             goto appendOk;
         case REPLY_REBELLION_ON:
-            index = Controller_AddRebellion(index);
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'B';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
             goto appendOn;
         case REPLY_REBELLION_OFF:
-            index = Controller_AddRebellion(index);
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'B';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
             goto appendOff;
         case REPLY_CONSUME_OK:
-            index = Controller_AddConsume(index);
+            txBuffer[index++] = 'C';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'U';
+            txBuffer[index++] = 'M';
+            txBuffer[index++] = 'E';
             goto appendOk;
         case REPLY_CONSUME_ERROR:
-            index = Controller_AddConsume(index);
+            txBuffer[index++] = 'C';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'U';
+            txBuffer[index++] = 'M';
+            txBuffer[index++] = 'E';
             goto appendError;
         case REPLY_BUTTON:
             txBuffer[index++] = 'S';
@@ -237,8 +228,8 @@ static unsigned char parseInitCommand (const char *text) {
     unsigned char chicken;
 
     while (text[i] != '$' && text[i] != '\0') {
-        if (nameIndex < sizeof(controllerFarmName) - 1) {
-            controllerFarmName[nameIndex++] = text[i];
+        if (nameIndex < sizeof(farmName) - 1) {
+            farmName[nameIndex++] = text[i];
         }
         i++;
     }
@@ -247,7 +238,7 @@ static unsigned char parseInitCommand (const char *text) {
         return 0;
     }
 
-    controllerFarmName[nameIndex] = '\0';
+    farmName[nameIndex] = '\0';
     i++;
 
     if (parseNumber(text, &i, &cow, '$') == 0) {
@@ -271,42 +262,8 @@ static unsigned char parseInitCommand (const char *text) {
         return 0;
     }
 
-    Farm_RequestConfigure(controllerFarmName, cow, horse, pig, chicken);
+    Farm_RequestConfigure(farmName, cow, horse, pig, chicken);
     return 1;
-}
-
-static unsigned char Controller_ParseCowSleep (const char *text, unsigned char *index) {
-    if (text[3] == 'A' && text[4] == 'C' && text[5] == 'A' && text[6] == '$') {
-        *index = 7;
-        return 1;
-    }
-    return 0;
-}
-
-static unsigned char Controller_ParsePigSleep (const char *text, unsigned char *index) {
-    if (text[3] == 'O' && text[4] == 'R' && text[5] == 'C' && text[6] == '$') {
-        *index = 7;
-        return 1;
-    }
-    return 0;
-}
-
-static unsigned char Controller_ParseHorseSleep (const char *text, unsigned char *index) {
-    if (text[3] == 'A' && text[4] == 'V' && text[5] == 'A' &&
-        text[6] == 'L' && text[7] == 'L' && text[8] == '$') {
-        *index = 9;
-        return 1;
-    }
-    return 0;
-}
-
-static unsigned char Controller_ParseChickenSleep (const char *text, unsigned char *index) {
-    if (text[3] == 'A' && text[4] == 'L' && text[5] == 'L' &&
-        text[6] == 'I' && text[7] == 'N' && text[8] == 'A' && text[9] == '$') {
-        *index = 10;
-        return 1;
-    }
-    return 0;
 }
 
 static unsigned char parseSleepCommand (const char *text) {
@@ -316,26 +273,32 @@ static unsigned char parseSleepCommand (const char *text) {
 
     switch (text[2]) {
         case 'V':
-            if (Controller_ParseCowSleep(text, &i) == 1) {
+            if (text[3] == 'A' && text[4] == 'C' && text[5] == 'A' && text[6] == '$') {
                 species = 0;
+                i = 7;
                 break;
             }
             return 0;
         case 'P':
-            if (Controller_ParsePigSleep(text, &i) == 1) {
+            if (text[3] == 'O' && text[4] == 'R' && text[5] == 'C' && text[6] == '$') {
                 species = 1;
+                i = 7;
                 break;
             }
             return 0;
         case 'C':
-            if (Controller_ParseHorseSleep(text, &i) == 1) {
+            if (text[3] == 'A' && text[4] == 'V' && text[5] == 'A' &&
+                text[6] == 'L' && text[7] == 'L' && text[8] == '$') {
                 species = 2;
+                i = 9;
                 break;
             }
             return 0;
         case 'G':
-            if (Controller_ParseChickenSleep(text, &i) == 1) {
+            if (text[3] == 'A' && text[4] == 'L' && text[5] == 'L' &&
+                text[6] == 'I' && text[7] == 'N' && text[8] == 'A' && text[9] == '$') {
                 species = 3;
+                i = 10;
                 break;
             }
             return 0;
@@ -357,48 +320,6 @@ static void Controller_ServiceFarm (void) {
     } else {
         Farm_SetCurrentDate(0, 0, 0, 0, 0, 0);
     }
-
-    if (EEPROM_IsBusy() != 0) {
-        return;
-    }
-
-    if ((controllerFlags & CTRL_FLAG_PERSISTENCE_LOADED) == 0) {
-        if (EEPROM_ReadByte(0) == FARM_STATE_MAGIC) {
-            Farm_BeginImportState();
-            for (persistenceIndex = 0; persistenceIndex < FARM_STATE_SIZE; persistenceIndex++) {
-                Farm_ImportStateByte(persistenceIndex, EEPROM_ReadByte((unsigned char)(persistenceIndex + 1)));
-            }
-            Farm_EndImportState();
-        }
-        controllerFlags |= CTRL_FLAG_PERSISTENCE_LOADED;
-    }
-
-    if ((controllerFlags & CTRL_FLAG_RESET_PENDING) != 0) {
-        EEPROM_RequestClear();
-        controllerFlags &= (unsigned char)(~CTRL_FLAG_RESET_PENDING);
-        return;
-    }
-
-    if ((controllerFlags & CTRL_FLAG_SAVE_ACTIVE) != 0) {
-        if (persistenceIndex == 0) {
-            if (EEPROM_StartByteWrite(0, FARM_STATE_MAGIC) == 1) {
-                persistenceIndex = 1;
-            }
-        } else if (persistenceIndex <= FARM_STATE_SIZE) {
-            if (EEPROM_StartByteWrite(persistenceIndex, Farm_ExportByte((unsigned char)(persistenceIndex - 1))) == 1) {
-                persistenceIndex++;
-            }
-        } else {
-            controllerFlags &= (unsigned char)(~CTRL_FLAG_SAVE_ACTIVE);
-            Farm_ClearDirty();
-        }
-        return;
-    }
-
-    if (Farm_IsDirty() == 1 && Farm_IsConfigured() == 1) {
-        controllerFlags |= CTRL_FLAG_SAVE_ACTIVE;
-        persistenceIndex = 0;
-    }
 }
 
 static void buildProductsLine (void) {
@@ -418,73 +339,6 @@ static void buildProductsLine (void) {
     txBuffer[index] = '\0';
 }
 
-static unsigned char Controller_AddCow (unsigned char index) {
-    txBuffer[index++] = 'V';
-    txBuffer[index++] = 'A';
-    txBuffer[index++] = 'C';
-    txBuffer[index++] = 'A';
-    return index;
-}
-
-static unsigned char Controller_AddPig (unsigned char index) {
-    txBuffer[index++] = 'P';
-    txBuffer[index++] = 'O';
-    txBuffer[index++] = 'R';
-    txBuffer[index++] = 'C';
-    return index;
-}
-
-static unsigned char Controller_AddHorse (unsigned char index) {
-    txBuffer[index++] = 'C';
-    txBuffer[index++] = 'A';
-    txBuffer[index++] = 'V';
-    txBuffer[index++] = 'A';
-    txBuffer[index++] = 'L';
-    txBuffer[index++] = 'L';
-    return index;
-}
-
-static unsigned char Controller_AddChicken (unsigned char index) {
-    txBuffer[index++] = 'G';
-    txBuffer[index++] = 'A';
-    txBuffer[index++] = 'L';
-    txBuffer[index++] = 'L';
-    txBuffer[index++] = 'I';
-    txBuffer[index++] = 'N';
-    txBuffer[index++] = 'A';
-    return index;
-}
-
-static unsigned char Controller_AddSpeciesName (unsigned char index, unsigned char species) {
-    switch (species) {
-        case 0:
-            return Controller_AddCow(index);
-        case 1:
-            return Controller_AddPig(index);
-        case 2:
-            return Controller_AddHorse(index);
-    }
-    return Controller_AddChicken(index);
-}
-
-static unsigned char Controller_AddAwake (unsigned char index) {
-    txBuffer[index++] = 'A';
-    txBuffer[index++] = 'W';
-    txBuffer[index++] = 'A';
-    txBuffer[index++] = 'K';
-    txBuffer[index++] = 'E';
-    return index;
-}
-
-static unsigned char Controller_AddSleepState (unsigned char index) {
-    txBuffer[index++] = 'S';
-    txBuffer[index++] = 'L';
-    txBuffer[index++] = 'E';
-    txBuffer[index++] = 'E';
-    txBuffer[index++] = 'P';
-    return index;
-}
-
 static void buildAnimalLine (unsigned char indexAnimal) {
     unsigned char species;
     unsigned char number;
@@ -495,15 +349,50 @@ static void buildAnimalLine (unsigned char indexAnimal) {
 
     txBuffer[0] = 'A';
     txBuffer[1] = ':';
-    index = Controller_AddSpeciesName(index, species);
+
+    if (species == 0) {
+        txBuffer[index++] = 'V';
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'C';
+        txBuffer[index++] = 'A';
+    } else if (species == 1) {
+        txBuffer[index++] = 'P';
+        txBuffer[index++] = 'O';
+        txBuffer[index++] = 'R';
+        txBuffer[index++] = 'C';
+    } else if (species == 2) {
+        txBuffer[index++] = 'C';
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'V';
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'L';
+        txBuffer[index++] = 'L';
+    } else {
+        txBuffer[index++] = 'G';
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'L';
+        txBuffer[index++] = 'L';
+        txBuffer[index++] = 'I';
+        txBuffer[index++] = 'N';
+        txBuffer[index++] = 'A';
+    }
+
     txBuffer[index++] = '$';
     index = appendNum(index, number);
     txBuffer[index++] = '$';
 
     if (critical == 1) {
-        index = Controller_AddSleepState(index);
+        txBuffer[index++] = 'S';
+        txBuffer[index++] = 'L';
+        txBuffer[index++] = 'E';
+        txBuffer[index++] = 'E';
+        txBuffer[index++] = 'P';
     } else {
-        index = Controller_AddAwake(index);
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'W';
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'K';
+        txBuffer[index++] = 'E';
     }
 
     txBuffer[index++] = '\r';
@@ -544,7 +433,6 @@ static unsigned char Controller_ProcessLine (const char *line, unsigned char *an
             if (line[1] == '\0') {
                 Farm_Reset();
                 Heartbeat_SetRebellion(0);
-                controllerFlags |= CTRL_FLAG_RESET_PENDING;
                 Controller_SetReply(REPLY_RESET_OK);
             }
             break;
@@ -605,93 +493,73 @@ static unsigned char Controller_ProcessInputs (void) {
     return 0;
 }
 
-static void Controller_StateIdle (void) {
+void motorController (void) {
+    static unsigned char state = 0;
+    static unsigned char animalIndex = 0;
     const char *line;
 
-    Controller_ServiceFarm();
-    line = SJ_GetLine();
-    if (line != 0) {
-        controllerState = Controller_ProcessLine(line, &controllerAnimalIndex);
-    } else {
-        controllerState = Controller_ProcessInputs();
-    }
-}
-
-static void Controller_StateWaitInit (void) {
-    if (Farm_IsConfigured() == 1) {
-        Controller_SetReply(REPLY_INIT_OK);
-        controllerState = 5;
-    }
-}
-
-static void Controller_StateWaitSearch (void) {
-    if (Farm_IsSearchFinished() == 1) {
-        if (Farm_IsAnimalFound() == 1) {
-            controllerState = 3;
-        } else {
-            Controller_SetReply(REPLY_SLEEP_ERROR);
-            controllerState = 5;
-        }
-    }
-}
-
-static void Controller_StateWaitRest (void) {
-    if (Farm_IsRestFinished() == 1) {
-        if (Farm_IsRestSuccess() == 1) {
-            Controller_SetReply(REPLY_SLEEP_OK);
-        } else {
-            Controller_SetReply(REPLY_SLEEP_ERROR);
-        }
-        controllerState = 5;
-    }
-}
-
-static void Controller_StateBuildAnimal (void) {
-    if (controllerAnimalIndex < Farm_GetAnimalCount()) {
-        buildAnimalLine(controllerAnimalIndex);
-        txLine = txBuffer;
-        controllerState = 6;
-    } else {
-        Controller_SetReply(REPLY_FINISH_ANIMALS);
-        controllerState = 5;
-    }
-}
-
-static void Controller_StateSendReply (void) {
-    if (SJ_PutString(txLine) == 1) {
-        controllerState = 0;
-    }
-}
-
-static void Controller_StateSendAnimal (void) {
-    if (SJ_PutString(txLine) == 1) {
-        controllerAnimalIndex++;
-        controllerState = 4;
-    }
-}
-
-void motorController (void) {
-    switch (controllerState) {
+    switch (state) {
         case 0:
-            Controller_StateIdle();
+            Controller_ServiceFarm();
+            line = SJ_GetLine();
+            if (line != 0) {
+                state = Controller_ProcessLine(line, &animalIndex);
+            } else {
+                state = Controller_ProcessInputs();
+            }
             break;
+
         case 1:
-            Controller_StateWaitInit();
+            if (Farm_IsConfigured() == 1) {
+                Controller_SetReply(REPLY_INIT_OK);
+                state = 5;
+            }
             break;
+
         case 2:
-            Controller_StateWaitSearch();
+            if (Farm_IsSearchFinished() == 1) {
+                if (Farm_IsAnimalFound() == 1) {
+                    state = 3;
+                } else {
+                    Controller_SetReply(REPLY_SLEEP_ERROR);
+                    state = 5;
+                }
+            }
             break;
+
         case 3:
-            Controller_StateWaitRest();
+            if (Farm_IsRestFinished() == 1) {
+                if (Farm_IsRestSuccess() == 1) {
+                    Controller_SetReply(REPLY_SLEEP_OK);
+                } else {
+                    Controller_SetReply(REPLY_SLEEP_ERROR);
+                }
+                state = 5;
+            }
             break;
+
         case 4:
-            Controller_StateBuildAnimal();
+            if (animalIndex < Farm_GetAnimalCount()) {
+                buildAnimalLine(animalIndex);
+                txLine = txBuffer;
+                state = 6;
+            } else {
+                Controller_SetReply(REPLY_FINISH_ANIMALS);
+                state = 5;
+            }
             break;
+
         case 5:
-            Controller_StateSendReply();
+            if (SJ_PutString(txLine) == 1) {
+                state = 0;
+            }
             break;
+
         case 6:
-            Controller_StateSendAnimal();
+            if (SJ_PutString(txLine) == 1) {
+                animalIndex++;
+                state = 4;
+            }
             break;
     }
 }

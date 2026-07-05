@@ -101,40 +101,31 @@ static void setTxBitIdx (unsigned char value) {
     bitIdxPair = (unsigned char)((bitIdxPair & 0x0F) | ((value & 0x0F) << 4));
 }
 
-static unsigned char SerialTime_GetNextTxByte (void) {
-    unsigned char b;
-
-    b = 0;
-    if (txEcho != 0) {
-        b = txEcho;
-        txEcho = 0;
-    } else if (txPtr != 0) {
-        if (*txPtr != '\0') {
-            b = *txPtr;
-            txPtr++;
-        } else {
-            txPtr = 0;
-        }
-    }
-    return b;
-}
-
-static void SerialTime_StartTxByte (unsigned char b) {
-    txShift = b;
-    setTxBitIdx(0);
-    txPos = 0;
-    txNext = 3;
-    stFlags |= ST_FLAG_TX_ACTIVE;
-}
-
 static void txTick (void) {
     unsigned char b;
     unsigned char txBitIdx;
 
     if ((stFlags & ST_FLAG_TX_ACTIVE) == 0) {
-        b = SerialTime_GetNextTxByte();
+        b = 0;
+
+        if (txEcho != 0) {
+            b = txEcho;
+            txEcho = 0;
+        } else if (txPtr != 0) {
+            if (*txPtr != '\0') {
+                b = *txPtr;
+                txPtr++;
+            } else {
+                txPtr = 0;
+            }
+        }
+
         if (b != 0) {
-            SerialTime_StartTxByte(b);
+            txShift = b;
+            setTxBitIdx(0);
+            txPos = 0;
+            txNext = 3;
+            stFlags |= ST_FLAG_TX_ACTIVE;
         }
         return;
     }
@@ -241,24 +232,6 @@ void SerialTime_StartBitISR (void) {
     stFlags |= ST_FLAG_RX_ACTIVE;
 }
 
-static void SerialTime_RxBitTick (unsigned char rxBitIdx) {
-    if (rxBitIdx < 8) {
-        rxShift >>= 1;
-        if (PORTBbits.RB2) {
-            rxShift |= 0x80;
-        }
-        setRxBitIdx((unsigned char)(rxBitIdx + 1));
-    } else {
-        if (PORTBbits.RB2) {
-            rxByte = rxShift;
-            stFlags |= ST_FLAG_RX_READY;
-        }
-        stFlags &= (unsigned char)(~ST_FLAG_RX_ACTIVE);
-        INTCON3bits.INT2IF = 0;
-        INTCON3bits.INT2IE = 1;
-    }
-}
-
 void SerialTime_TickISR (void) {
     unsigned char rxBitIdx;
 
@@ -275,7 +248,21 @@ void SerialTime_TickISR (void) {
     rxNext = (unsigned char)(rxNext + 10);
 
     rxBitIdx = getRxBitIdx();
-    SerialTime_RxBitTick(rxBitIdx);
+    if (rxBitIdx < 8) {
+        rxShift >>= 1;
+        if (PORTBbits.RB2) {
+            rxShift |= 0x80;
+        }
+        setRxBitIdx((unsigned char)(rxBitIdx + 1));
+    } else {
+        if (PORTBbits.RB2) {
+            rxByte = rxShift;
+            stFlags |= ST_FLAG_RX_READY;
+        }
+        stFlags &= (unsigned char)(~ST_FLAG_RX_ACTIVE);
+        INTCON3bits.INT2IF = 0;
+        INTCON3bits.INT2IE = 1;
+    }
 
     txTick();
 }

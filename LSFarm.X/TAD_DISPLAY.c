@@ -15,64 +15,64 @@
 static char displayLine[17];
 static char displayCtrl;
 
-static void Display_LoadNewMessage (unsigned char product) {
-    displayLine[0] = 'N';
-    displayLine[1] = 'u';
-    displayLine[2] = 'e';
-    displayLine[3] = 'v';
-    displayLine[4] = 'o';
-    displayLine[5] = ' ';
-    if (product == 0) {
-        displayLine[6] = 'A';
-        displayLine[7] = 'n';
-        displayLine[8] = 'i';
-        displayLine[9] = 'm';
-        displayLine[10] = 'a';
-        displayLine[11] = 'l';
-        displayLine[12] = '\0';
-    } else {
-        displayLine[6] = 'P';
-        displayLine[7] = 'r';
+static void Display_LoadMessage (unsigned char messageId) {
+    if (messageId < 2) {
+        displayLine[0] = 'N';
+        displayLine[1] = 'u';
+        displayLine[2] = 'e';
+        displayLine[3] = 'v';
+        displayLine[4] = 'o';
+        displayLine[5] = ' ';
+        if (messageId == 0) {
+            displayLine[6] = 'A';
+            displayLine[7] = 'n';
+            displayLine[8] = 'i';
+            displayLine[9] = 'm';
+            displayLine[10] = 'a';
+            displayLine[11] = 'l';
+            displayLine[12] = '\0';
+        } else {
+            displayLine[6] = 'P';
+            displayLine[7] = 'r';
+            displayLine[8] = 'o';
+            displayLine[9] = 'd';
+            displayLine[10] = 'u';
+            displayLine[11] = 'c';
+            displayLine[12] = 't';
+            displayLine[13] = 'o';
+            displayLine[14] = '\0';
+        }
+    } else if (messageId == 2) {
+        displayLine[0] = 'E';
+        displayLine[1] = 's';
+        displayLine[2] = 'p';
+        displayLine[3] = 'e';
+        displayLine[4] = 'r';
+        displayLine[5] = 'a';
+        displayLine[6] = 'n';
+        displayLine[7] = 'd';
         displayLine[8] = 'o';
-        displayLine[9] = 'd';
-        displayLine[10] = 'u';
-        displayLine[11] = 'c';
-        displayLine[12] = 't';
-        displayLine[13] = 'o';
+        displayLine[9] = ' ';
+        displayLine[10] = 'I';
+        displayLine[11] = 'n';
+        displayLine[12] = 'i';
+        displayLine[13] = 't';
         displayLine[14] = '\0';
+    } else if (messageId == 3) {
+        displayLine[0] = 'F';
+        displayLine[1] = 'a';
+        displayLine[2] = 'l';
+        displayLine[3] = 't';
+        displayLine[4] = 'a';
+        displayLine[5] = ' ';
+        displayLine[6] = 'H';
+        displayLine[7] = 'o';
+        displayLine[8] = 'r';
+        displayLine[9] = 'a';
+        displayLine[10] = '\0';
+    } else {
+        displayLine[0] = '\0';
     }
-}
-
-static void Display_LoadInitMessage (void) {
-    displayLine[0] = 'E';
-    displayLine[1] = 's';
-    displayLine[2] = 'p';
-    displayLine[3] = 'e';
-    displayLine[4] = 'r';
-    displayLine[5] = 'a';
-    displayLine[6] = 'n';
-    displayLine[7] = 'd';
-    displayLine[8] = 'o';
-    displayLine[9] = ' ';
-    displayLine[10] = 'I';
-    displayLine[11] = 'n';
-    displayLine[12] = 'i';
-    displayLine[13] = 't';
-    displayLine[14] = '\0';
-}
-
-static void Display_LoadTimeMessage (void) {
-    displayLine[0] = 'F';
-    displayLine[1] = 'a';
-    displayLine[2] = 'l';
-    displayLine[3] = 't';
-    displayLine[4] = 'a';
-    displayLine[5] = ' ';
-    displayLine[6] = 'H';
-    displayLine[7] = 'o';
-    displayLine[8] = 'r';
-    displayLine[9] = 'a';
-    displayLine[10] = '\0';
 }
 
 static void Display_Put2Digits (unsigned char index, unsigned char value) {
@@ -130,9 +130,9 @@ static void Display_PutNumber (unsigned char value) {
 
 static void Display_ShowNotification (const FarmNotification *notification) {
     if (notification->kind == FARM_NOTIFICATION_ANIMAL) {
-        Display_LoadNewMessage(0);
+        Display_LoadMessage(0);
     } else {
-        Display_LoadNewMessage(1);
+        Display_LoadMessage(1);
     }
     Display_PutFixedLine(0, displayLine);
     Display_PutNumber(notification->number);
@@ -141,7 +141,7 @@ static void Display_ShowNotification (const FarmNotification *notification) {
 
 static void Display_ShowIdleScreen (void) {
     if (Farm_IsConfigured() == 0) {
-        Display_LoadInitMessage();
+        Display_LoadMessage(2);
         Display_PutFixedLine(0, displayLine);
         displayLine[0] = '\0';
         Display_PutFixedLine(1, displayLine);
@@ -150,7 +150,7 @@ static void Display_ShowIdleScreen (void) {
 
     if (SerialTime_IsConfigured() == 0) {
         Display_PutFixedLine(0, Farm_GetName());
-        Display_LoadTimeMessage();
+        Display_LoadMessage(3);
         Display_PutFixedLine(1, displayLine);
         return;
     }
