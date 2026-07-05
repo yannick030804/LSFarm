@@ -1,8 +1,10 @@
 #include <xc.h>
 #include "TAD_EEPROM.h"
 
-static unsigned char mode;
+unsigned char EEPROM_Mode;
 static unsigned char clearIndex;
+
+#define mode EEPROM_Mode
 
 static void launchWrite (void) {
     EECON1bits.EEPGD = 0;
@@ -59,10 +61,6 @@ unsigned char EEPROM_StartByteWrite (unsigned char addr, unsigned char data) {
     EEDATA = data;
     mode = 1;
     return 1;
-}
-
-unsigned char EEPROM_IsBusy (void) {
-    return (unsigned char)(mode != 0);
 }
 
 void EEPROM_RequestClear (void) {

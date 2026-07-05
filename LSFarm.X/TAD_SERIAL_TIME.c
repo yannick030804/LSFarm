@@ -21,6 +21,7 @@ static volatile unsigned char txPos;
 static volatile unsigned char txNext;
 static volatile unsigned char txEcho;
 static const char *txPtr;
+static unsigned char txMessageState;
 
 static char rxChars[SERIAL_TIME_LINE_MAX];
 static unsigned char rxLen;
@@ -116,7 +117,35 @@ static void txTick (void) {
                 b = *txPtr;
                 txPtr++;
             } else {
-                txPtr = 0;
+                switch (txMessageState) {
+                    case 1:
+                        txPtr = "Date and time ";
+                        txMessageState = 2;
+                        break;
+                    case 2:
+                        txPtr = "correct";
+                        txMessageState = 3;
+                        break;
+                    case 3:
+                        txPtr = "\r\n";
+                        txMessageState = 0;
+                        break;
+                    case 4:
+                        txPtr = "Please input a ";
+                        txMessageState = 5;
+                        break;
+                    case 5:
+                        txPtr = "correct ";
+                        txMessageState = 6;
+                        break;
+                    case 6:
+                        txPtr = "date";
+                        txMessageState = 3;
+                        break;
+                    default:
+                        txPtr = 0;
+                        break;
+                }
             }
         }
 
@@ -187,9 +216,11 @@ void motorSerialTime (void) {
             break;
         case 1:
             if (SerialTime_ParseLine() == 1) {
-                txPtr = "\r\nDate and time correct\r\n";
+                txPtr = "\r\n";
+                txMessageState = 1;
             } else {
-                txPtr = "\r\nPlease input a correct date\r\n";
+                txPtr = "\r\n";
+                txMessageState = 4;
             }
             rxLen = 0;
             state = 2;
