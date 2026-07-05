@@ -91,6 +91,10 @@ static void Farm_SetAnimalCritical (unsigned char index, unsigned char critical)
 static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes);
 static unsigned char Farm_ExportAnimalByte (unsigned char index);
 static void Farm_ImportAnimalByte (unsigned char index, unsigned char value);
+static unsigned char Farm_HandleState0To2 (unsigned char state, unsigned char *copyIndex);
+static unsigned char Farm_HandleState3To5 (unsigned char state, unsigned char *speciesIndex, unsigned char *animalIndex, unsigned char *now);
+static unsigned char Farm_HandleSearchStart (unsigned char *speciesNumber);
+static unsigned char Farm_HandleSearchStep (unsigned char *animalIndex, unsigned char *speciesNumber);
 
 void Farm_Init (void) {
     TI_NewTimer(&timerHandle);
@@ -118,62 +122,15 @@ void motorFarm (void) {
 
     switch (state) {
         case 0:
-            if (configRequested == 1) {
-                copyIndex = 0;
-                state++;
-            }
-            break;
-
         case 1:
-            if (pendingName[copyIndex] != '\0' && copyIndex < sizeof(farmName) - 1) {
-                farmName[copyIndex] = pendingName[copyIndex];
-                copyIndex++;
-            } else {
-                farmName[copyIndex] = '\0';
-                state++;
-            }
-            break;
-
         case 2:
-            Farm_ClearCurrentData();
-            GENERATION_TIME(SPECIES_COW) = PENDING_TIME(SPECIES_COW);
-            GENERATION_TIME(SPECIES_PIG) = PENDING_TIME(SPECIES_PIG);
-            GENERATION_TIME(SPECIES_HORSE) = PENDING_TIME(SPECIES_HORSE);
-            GENERATION_TIME(SPECIES_CHICKEN) = PENDING_TIME(SPECIES_CHICKEN);
-            configured = 1;
-            configRequested = 0;
-            Farm_MarkDirty();
-            TI_ResetTics(timerHandle);
-            state++;
-            break;
-
         case 3:
-            if (configured == 0 || currentDateValid == 0) {
-                break;
-            }
-            speciesIndex = 0;
-            state++;
-            break;
-
         case 4:
-            now = Farm_GetNowSeconds();
-            if (speciesIndex < FARM_NUM_SPECIES) {
-                Farm_ProcessGeneration(speciesIndex, now);
-                speciesIndex++;
-            } else {
-                speciesIndex = 0;
-                state++;
-            }
-            break;
-
         case 5:
-            now = Farm_GetNowSeconds();
-            if (speciesIndex < FARM_NUM_SPECIES) {
-                Farm_ProcessProducts(speciesIndex, now);
-                speciesIndex++;
+            if (state < 3) {
+                state = Farm_HandleState0To2(state, &copyIndex);
             } else {
-                animalIndex = 0;
-                state++;
+                state = Farm_HandleState3To5(state, &speciesIndex, &animalIndex, &now);
             }
             break;
 
@@ -183,38 +140,14 @@ void motorFarm (void) {
                 animalIndex++;
             } else if (searchRequested == 1) {
                 animalIndex = 0;
-                speciesNumber = 0;
-                searchFinished = 0;
-                searchFound = 0;
-                selectedAnimalIndex = -1;
-                state++;
+                state = Farm_HandleSearchStart(&speciesNumber);
             } else {
                 state = 3;
             }
             break;
 
         case 7:
-            if (animalIndex < totalAnimals) {
-                if (ANIMAL_SPECIES(animalIndex) == selectedAnimalSpecies) {
-                    speciesNumber++;
-                }
-                if (ANIMAL_SPECIES(animalIndex) == selectedAnimalSpecies && speciesNumber == selectedAnimalNumber) {
-                    selectedAnimalIndex = (signed char)animalIndex;
-                    searchFound = 1;
-                    searchFinished = 1;
-                    restRequestPending = 1;
-                    restFinished = 0;
-                    restSuccess = 0;
-                    searchRequested = 0;
-                    state = 3;
-                } else {
-                    animalIndex++;
-                }
-            } else {
-                searchFinished = 1;
-                searchRequested = 0;
-                state = 3;
-            }
+            state = Farm_HandleSearchStep(&animalIndex, &speciesNumber);
             break;
     }
 }
@@ -756,6 +689,99 @@ static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes) {
             GENERATION_TIME(i) = 0;
         }
     }
+}
+
+static unsigned char Farm_HandleState0To2 (unsigned char state, unsigned char *copyIndex) {
+    if (state == 0) {
+        if (configRequested == 1) {
+            *copyIndex = 0;
+            return 1;
+        }
+        return 0;
+    }
+
+    if (state == 1) {
+        if (pendingName[*copyIndex] != '\0' && *copyIndex < sizeof(farmName) - 1) {
+            farmName[*copyIndex] = pendingName[*copyIndex];
+            (*copyIndex)++;
+        } else {
+            farmName[*copyIndex] = '\0';
+            return 2;
+        }
+        return 1;
+    }
+
+    Farm_ClearCurrentData();
+    GENERATION_TIME(SPECIES_COW) = PENDING_TIME(SPECIES_COW);
+    GENERATION_TIME(SPECIES_PIG) = PENDING_TIME(SPECIES_PIG);
+    GENERATION_TIME(SPECIES_HORSE) = PENDING_TIME(SPECIES_HORSE);
+    GENERATION_TIME(SPECIES_CHICKEN) = PENDING_TIME(SPECIES_CHICKEN);
+    configured = 1;
+    configRequested = 0;
+    Farm_MarkDirty();
+    TI_ResetTics(timerHandle);
+    return 3;
+}
+
+static unsigned char Farm_HandleState3To5 (unsigned char state, unsigned char *speciesIndex, unsigned char *animalIndex, unsigned char *now) {
+    if (state == 3) {
+        if (configured == 0 || currentDateValid == 0) {
+            return 3;
+        }
+        *speciesIndex = 0;
+        return 4;
+    }
+
+    *now = Farm_GetNowSeconds();
+    if (*speciesIndex < FARM_NUM_SPECIES) {
+        if (state == 4) {
+            Farm_ProcessGeneration(*speciesIndex, *now);
+        } else {
+            Farm_ProcessProducts(*speciesIndex, *now);
+        }
+        (*speciesIndex)++;
+        return state;
+    }
+
+    if (state == 4) {
+        *speciesIndex = 0;
+        return 5;
+    }
+
+    *animalIndex = 0;
+    return 6;
+}
+
+static unsigned char Farm_HandleSearchStart (unsigned char *speciesNumber) {
+    *speciesNumber = 0;
+    searchFinished = 0;
+    searchFound = 0;
+    selectedAnimalIndex = -1;
+    return 7;
+}
+
+static unsigned char Farm_HandleSearchStep (unsigned char *animalIndex, unsigned char *speciesNumber) {
+    if (*animalIndex < totalAnimals) {
+        if (ANIMAL_SPECIES(*animalIndex) == selectedAnimalSpecies) {
+            (*speciesNumber)++;
+        }
+        if (ANIMAL_SPECIES(*animalIndex) == selectedAnimalSpecies && *speciesNumber == selectedAnimalNumber) {
+            selectedAnimalIndex = (signed char)(*animalIndex);
+            searchFound = 1;
+            searchFinished = 1;
+            restRequestPending = 1;
+            restFinished = 0;
+            restSuccess = 0;
+            searchRequested = 0;
+            return 3;
+        }
+        (*animalIndex)++;
+        return 7;
+    }
+
+    searchFinished = 1;
+    searchRequested = 0;
+    return 3;
 }
 
 static unsigned char Farm_ExportAnimalByte (unsigned char index) {
