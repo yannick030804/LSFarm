@@ -235,15 +235,11 @@ void Farm_RequestConfigure (const char *name, unsigned char cow, unsigned char h
 }
 
 void Farm_RequestSelectAnimal (unsigned char species, unsigned char number) {
+    Farm_ResetSelectionState();
     selectedAnimalSpecies = species;
     selectedAnimalNumber = number;
     selectedAnimalIndex = -1;
     searchRequested = 1;
-    searchFinished = 0;
-    searchFound = 0;
-    restRequestPending = 0;
-    restFinished = 0;
-    restSuccess = 0;
 }
 
 unsigned char Farm_IsSearchFinished (void) {
@@ -288,22 +284,15 @@ void Farm_NotifyRestSuccess (void) {
     }
 
     Farm_StoreSleepDate(index);
-    restRequestPending = 0;
+    Farm_MarkDirty();
+    Farm_ResetSelectionState();
     restFinished = 1;
     restSuccess = 1;
-    Farm_MarkDirty();
-    selectedAnimalSpecies = 0;
-    selectedAnimalNumber = 0;
-    selectedAnimalIndex = -1;
 }
 
 void Farm_NotifyRestTimeout (void) {
-    restRequestPending = 0;
+    Farm_ResetSelectionState();
     restFinished = 1;
-    restSuccess = 0;
-    selectedAnimalSpecies = 0;
-    selectedAnimalNumber = 0;
-    selectedAnimalIndex = -1;
 }
 
 unsigned char Farm_IsConfigured (void) {

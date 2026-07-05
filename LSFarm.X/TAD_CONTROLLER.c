@@ -13,21 +13,21 @@
 #define CTRL_FLAG_RESET_PENDING      0x02
 #define CTRL_FLAG_SAVE_ACTIVE        0x04
 
-#define MSG_INIT_OK        "INIT OK\r\n"
-#define MSG_INIT_ERROR     "INIT ERROR\r\n"
-#define MSG_SLEEP_OK       "SLEEP OK\r\n"
-#define MSG_SLEEP_ERROR    "SLEEP ERROR\r\n"
-#define MSG_RESET_OK       "RESET OK\r\n"
-#define MSG_REBELLION_ON   "REBELLION ON\r\n"
-#define MSG_REBELLION_OFF  "REBELLION OFF\r\n"
-#define MSG_CONSUME_OK     "CONSUME OK\r\n"
-#define MSG_CONSUME_ERROR  "CONSUME ERROR\r\n"
-#define MSG_BUTTON         "S\r\n"
-#define MSG_FINISH_ANIMALS "F\r\n"
-#define MSG_UP             "U\r\n"
-#define MSG_DOWN           "D\r\n"
-#define MSG_LEFT           "L\r\n"
-#define MSG_RIGHT          "R\r\n"
+#define REPLY_INIT_OK       0
+#define REPLY_INIT_ERROR    1
+#define REPLY_SLEEP_OK      2
+#define REPLY_SLEEP_ERROR   3
+#define REPLY_RESET_OK      4
+#define REPLY_REBELLION_ON  5
+#define REPLY_REBELLION_OFF 6
+#define REPLY_CONSUME_OK    7
+#define REPLY_CONSUME_ERROR 8
+#define REPLY_BUTTON        9
+#define REPLY_FINISH_ANIMALS 10
+#define REPLY_UP            11
+#define REPLY_DOWN          12
+#define REPLY_LEFT          13
+#define REPLY_RIGHT         14
 
 static const char *txLine;
 static char farmName[17];
@@ -67,6 +67,150 @@ static unsigned char appendNum (unsigned char index, unsigned char value) {
 
     txBuffer[index++] = (char)('0' + value);
     return index;
+}
+
+static void Controller_EndReply (unsigned char index) {
+    txBuffer[index++] = '\r';
+    txBuffer[index++] = '\n';
+    txBuffer[index] = '\0';
+    txLine = txBuffer;
+}
+
+static void Controller_SetReply (unsigned char reply) {
+    unsigned char index = 0;
+
+    switch (reply) {
+        case REPLY_INIT_OK:
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'T';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'K';
+            break;
+        case REPLY_INIT_ERROR:
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'T';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'R';
+            break;
+        case REPLY_SLEEP_OK:
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'P';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'K';
+            break;
+        case REPLY_SLEEP_ERROR:
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'P';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'R';
+            break;
+        case REPLY_RESET_OK:
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'T';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'K';
+            break;
+        case REPLY_REBELLION_ON:
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'B';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            break;
+        case REPLY_REBELLION_OFF:
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'B';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'L';
+            txBuffer[index++] = 'I';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'F';
+            txBuffer[index++] = 'F';
+            break;
+        case REPLY_CONSUME_OK:
+            txBuffer[index++] = 'C';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'U';
+            txBuffer[index++] = 'M';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'K';
+            break;
+        case REPLY_CONSUME_ERROR:
+            txBuffer[index++] = 'C';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'N';
+            txBuffer[index++] = 'S';
+            txBuffer[index++] = 'U';
+            txBuffer[index++] = 'M';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = ' ';
+            txBuffer[index++] = 'E';
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'R';
+            txBuffer[index++] = 'O';
+            txBuffer[index++] = 'R';
+            break;
+        case REPLY_BUTTON:
+            txBuffer[index++] = 'S';
+            break;
+        case REPLY_FINISH_ANIMALS:
+            txBuffer[index++] = 'F';
+            break;
+        case REPLY_UP:
+            txBuffer[index++] = 'U';
+            break;
+        case REPLY_DOWN:
+            txBuffer[index++] = 'D';
+            break;
+        case REPLY_LEFT:
+            txBuffer[index++] = 'L';
+            break;
+        default:
+            txBuffer[index++] = 'R';
+            break;
+    }
+
+    Controller_EndReply(index);
 }
 
 static unsigned char parseNumber (const char *text, unsigned char *index, unsigned char *value, char endChar) {
@@ -250,7 +394,6 @@ static void buildAnimalLine (unsigned char indexAnimal) {
     unsigned char number;
     unsigned char critical;
     unsigned char index = 2;
-    const char *name;
 
     Farm_GetAnimal(indexAnimal, &species, &number, &critical);
 
@@ -258,17 +401,30 @@ static void buildAnimalLine (unsigned char indexAnimal) {
     txBuffer[1] = ':';
 
     if (species == 0) {
-        name = "VACA";
+        txBuffer[index++] = 'V';
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'C';
+        txBuffer[index++] = 'A';
     } else if (species == 1) {
-        name = "PORC";
+        txBuffer[index++] = 'P';
+        txBuffer[index++] = 'O';
+        txBuffer[index++] = 'R';
+        txBuffer[index++] = 'C';
     } else if (species == 2) {
-        name = "CAVALL";
+        txBuffer[index++] = 'C';
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'V';
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'L';
+        txBuffer[index++] = 'L';
     } else {
-        name = "GALLINA";
-    }
-
-    while (*name != '\0') {
-        txBuffer[index++] = *name++;
+        txBuffer[index++] = 'G';
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'L';
+        txBuffer[index++] = 'L';
+        txBuffer[index++] = 'I';
+        txBuffer[index++] = 'N';
+        txBuffer[index++] = 'A';
     }
 
     txBuffer[index++] = '$';
@@ -276,13 +432,17 @@ static void buildAnimalLine (unsigned char indexAnimal) {
     txBuffer[index++] = '$';
 
     if (critical == 1) {
-        name = "SLEEP";
+        txBuffer[index++] = 'S';
+        txBuffer[index++] = 'L';
+        txBuffer[index++] = 'E';
+        txBuffer[index++] = 'E';
+        txBuffer[index++] = 'P';
     } else {
-        name = "AWAKE";
-    }
-
-    while (*name != '\0') {
-        txBuffer[index++] = *name++;
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'W';
+        txBuffer[index++] = 'A';
+        txBuffer[index++] = 'K';
+        txBuffer[index++] = 'E';
     }
 
     txBuffer[index++] = '\r';
@@ -304,7 +464,7 @@ void motorController (void) {
             Controller_ServiceFarm();
             line = SJ_GetLine();
             if (line != 0) {
-                txLine = MSG_INIT_ERROR;
+                Controller_SetReply(REPLY_INIT_ERROR);
                 state = 5;
                 switch (line[0]) {
                     case 'I':
@@ -316,7 +476,7 @@ void motorController (void) {
                         if (line[1] == ':' && parseSleepCommand(line) == 1) {
                             state = 2;
                         } else {
-                            txLine = MSG_SLEEP_ERROR;
+                            Controller_SetReply(REPLY_SLEEP_ERROR);
                         }
                         break;
                     case 'G':
@@ -336,21 +496,21 @@ void motorController (void) {
                             Farm_Reset();
                             Heartbeat_SetRebellion(0);
                             controllerFlags |= CTRL_FLAG_RESET_PENDING;
-                            txLine = MSG_RESET_OK;
+                            Controller_SetReply(REPLY_RESET_OK);
                         }
                         break;
                     case 'B':
                         if (line[1] == '\0') {
                             Farm_SetRebellion(1);
                             Heartbeat_SetRebellion(1);
-                            txLine = MSG_REBELLION_ON;
+                            Controller_SetReply(REPLY_REBELLION_ON);
                         }
                         break;
                     case 'P':
                         if (line[1] == '\0') {
                             Farm_SetRebellion(0);
                             Heartbeat_SetRebellion(0);
-                            txLine = MSG_REBELLION_OFF;
+                            Controller_SetReply(REPLY_REBELLION_OFF);
                         }
                         break;
                     case 'C':
@@ -358,33 +518,33 @@ void motorController (void) {
                             recipeId = (unsigned char)(line[2] - '0');
                             if (recipeId <= 3) {
                                 Farm_Consume(recipeId);
-                                txLine = MSG_CONSUME_OK;
+                                Controller_SetReply(REPLY_CONSUME_OK);
                             } else {
-                                txLine = MSG_CONSUME_ERROR;
+                                Controller_SetReply(REPLY_CONSUME_ERROR);
                             }
                         }
                         break;
                 }
             } else if (getButton() == 1) {
-                txLine = MSG_BUTTON;
+                Controller_SetReply(REPLY_BUTTON);
                 state = 5;
             } else {
                 recipeId = Joystick_GetEvent();
                 switch (recipeId) {
                     case JOY_EVT_UP:
-                        txLine = MSG_UP;
+                        Controller_SetReply(REPLY_UP);
                         state = 5;
                         break;
                     case JOY_EVT_DOWN:
-                        txLine = MSG_DOWN;
+                        Controller_SetReply(REPLY_DOWN);
                         state = 5;
                         break;
                     case JOY_EVT_LEFT:
-                        txLine = MSG_LEFT;
+                        Controller_SetReply(REPLY_LEFT);
                         state = 5;
                         break;
                     case JOY_EVT_RIGHT:
-                        txLine = MSG_RIGHT;
+                        Controller_SetReply(REPLY_RIGHT);
                         state = 5;
                         break;
                 }
@@ -393,7 +553,7 @@ void motorController (void) {
 
         case 1:
             if (Farm_IsConfigured() == 1) {
-                txLine = MSG_INIT_OK;
+                Controller_SetReply(REPLY_INIT_OK);
                 state = 5;
             }
             break;
@@ -403,7 +563,7 @@ void motorController (void) {
                 if (Farm_IsAnimalFound() == 1) {
                     state = 3;
                 } else {
-                    txLine = MSG_SLEEP_ERROR;
+                    Controller_SetReply(REPLY_SLEEP_ERROR);
                     state = 5;
                 }
             }
@@ -412,9 +572,9 @@ void motorController (void) {
         case 3:
             if (Farm_IsRestFinished() == 1) {
                 if (Farm_IsRestSuccess() == 1) {
-                    txLine = MSG_SLEEP_OK;
+                    Controller_SetReply(REPLY_SLEEP_OK);
                 } else {
-                    txLine = MSG_SLEEP_ERROR;
+                    Controller_SetReply(REPLY_SLEEP_ERROR);
                 }
                 state = 5;
             }
@@ -426,7 +586,7 @@ void motorController (void) {
                 txLine = txBuffer;
                 state = 6;
             } else {
-                txLine = MSG_FINISH_ANIMALS;
+                Controller_SetReply(REPLY_FINISH_ANIMALS);
                 state = 5;
             }
             break;

@@ -74,16 +74,13 @@ static void Display_PutNumber (unsigned char value) {
 }
 
 static void Display_ShowNotification (const FarmNotification *notification) {
-    const char *title;
+    Display_PutNumber(notification->number);
 
     if (notification->kind == FARM_NOTIFICATION_ANIMAL) {
-        title = "Nuevo Animal";
+        Display_ShowText("Nuevo Animal", displayLine);
     } else {
-        title = "Nuevo Producto";
+        Display_ShowText("Nuevo Producto", displayLine);
     }
-
-    Display_PutNumber(notification->number);
-    Display_ShowText(title, displayLine);
 }
 
 static void Display_ShowIdleScreen (void) {
