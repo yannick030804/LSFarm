@@ -84,13 +84,11 @@ static void Farm_ProcessCriticalAnimal (unsigned char index);
 static void Farm_ResetSelectionState (void);
 static unsigned long Farm_BuildDateSeconds (unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second);
 static unsigned char Farm_GetNowSeconds (void);
-static unsigned long Farm_GetCurrentDateStamp (void);
 static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index);
 static void Farm_StoreSleepDate (unsigned char index);
 static void Farm_SetAnimalSpecies (unsigned char index, unsigned char species);
 static void Farm_SetAnimalCritical (unsigned char index, unsigned char critical);
 static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes);
-static unsigned char Farm_GetProductTime (unsigned char species);
 
 void Farm_Init (void) {
     TI_NewTimer(&timerHandle);
@@ -381,13 +379,11 @@ unsigned char Farm_GetNotification (FarmNotification *notification) {
 
 void Farm_SetCurrentDate (unsigned char valid, unsigned char day, unsigned char month, unsigned char hour, unsigned char minute, unsigned char second) {
     currentDateValid = valid;
-    if (valid == 1) {
-        currentDay = day;
-        currentMonth = month;
-        currentHour = hour;
-        currentMinute = minute;
-        currentSecond = second;
-    }
+    currentDay = day;
+    currentMonth = month;
+    currentHour = hour;
+    currentMinute = minute;
+    currentSecond = second;
 }
 
 unsigned char Farm_ExportByte (unsigned char index) {
@@ -657,12 +653,23 @@ static void Farm_ProcessGeneration (unsigned char species, unsigned char now) {
 static void Farm_ProcessProducts (unsigned char species, unsigned char now) {
     unsigned char awakeCount;
     unsigned char totalProducts;
+    unsigned char productTime;
 
     if (rebellion == 1) {
         return;
     }
 
-    if ((unsigned char)(now - LAST_PRODUCT(species)) < Farm_GetProductTime(species)) {
+    if (species == SPECIES_COW) {
+        productTime = 47;
+    } else if (species == SPECIES_PIG) {
+        productTime = 31;
+    } else if (species == SPECIES_HORSE) {
+        productTime = 23;
+    } else {
+        productTime = 13;
+    }
+
+    if ((unsigned char)(now - LAST_PRODUCT(species)) < productTime) {
         return;
     }
 
@@ -771,15 +778,11 @@ static unsigned char Farm_GetNowSeconds (void) {
     return seconds;
 }
 
-static unsigned long Farm_GetCurrentDateStamp (void) {
-    return Farm_BuildDateSeconds(currentDay, currentMonth, currentHour, currentMinute, currentSecond);
-}
-
 static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index) {
     unsigned long currentTotal;
     unsigned long sleepTotal;
 
-    currentTotal = Farm_GetCurrentDateStamp();
+    currentTotal = Farm_BuildDateSeconds(currentDay, currentMonth, currentHour, currentMinute, currentSecond);
     sleepTotal = animalSleepStamp[index];
 
     if (currentTotal >= sleepTotal) {
@@ -790,7 +793,7 @@ static unsigned long Farm_GetSleepElapsedSeconds (unsigned char index) {
 }
 
 static void Farm_StoreSleepDate (unsigned char index) {
-    animalSleepStamp[index] = Farm_GetCurrentDateStamp();
+    animalSleepStamp[index] = Farm_BuildDateSeconds(currentDay, currentMonth, currentHour, currentMinute, currentSecond);
 }
 
 static void Farm_SetAnimalSpecies (unsigned char index, unsigned char species) {
@@ -818,17 +821,4 @@ static void Farm_ClearSpeciesData (unsigned char clearGenerationTimes) {
             GENERATION_TIME(i) = 0;
         }
     }
-}
-
-static unsigned char Farm_GetProductTime (unsigned char species) {
-    if (species == SPECIES_COW) {
-        return 47;
-    }
-    if (species == SPECIES_PIG) {
-        return 31;
-    }
-    if (species == SPECIES_HORSE) {
-        return 23;
-    }
-    return 13;
 }

@@ -8,7 +8,6 @@ static unsigned char rebellion;
 void Heartbeat_Init (void) {
     CONFIG_HEARTBEAT;
     TI_NewTimer(&timerHandle);
-    rebellion = 0;
     HEARTBEAT = 0;
     TI_ResetTics(timerHandle);
 }

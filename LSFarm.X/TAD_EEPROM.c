@@ -17,8 +17,6 @@ static void launchWrite (void) {
 }
 
 void EEPROM_Init (void) {
-    mode = 0;
-    clearIndex = 0;
 }
 
 void motorEEPROM (void) {

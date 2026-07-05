@@ -8,7 +8,6 @@ static unsigned char isPressed;
 void Button_Init (void) {
     CONFIG_BTN;
     TI_NewTimer(&timerHandle);
-    isPressed = 0;
 }
 
 unsigned char getButton (void) {

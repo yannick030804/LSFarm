@@ -12,9 +12,6 @@ void SerialJava_Init (void) {
     RCSTA = 0x90;
     SPBRG = 64;
     BAUDCON = 0x00;
-
-    stringIndex = 0;
-    lineIndex = 0;
 }
 
 unsigned char SJ_PutString (const char *str) {

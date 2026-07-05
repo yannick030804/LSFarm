@@ -106,7 +106,6 @@ static void Display_ShowIdleScreen (void) {
 
 void Display_Init (void) {
     TI_NewTimer((unsigned char *)&displayCtrl);
-    DISPLAY_SET_STATE(0);
 }
 
 void motorDisplay (void) {
