@@ -155,26 +155,6 @@ static void txTick (void) {
 void SerialTime_Init (void) {
     CONFIG_SERIAL_TIME;
 
-    rxByte = 0;
-    stFlags = 0;
-    bitIdxPair = 0;
-    rxShift = 0;
-    rxPos = 0;
-    rxNext = 0;
-    txShift = 0;
-    txPos = 0;
-    txNext = 0;
-    txEcho = 0;
-    txPtr = 0;
-
-    rxLen = 0;
-
-    currentDay = 0;
-    currentMonth = 0;
-    currentHour = 0;
-    currentMinute = 0;
-    currentSecond = 0;
-
     INTCON2bits.INTEDG2 = 0;
     INTCON3bits.INT2IF = 0;
     INTCON3bits.INT2IE = 1;
@@ -288,10 +268,7 @@ void SerialTime_TickISR (void) {
 }
 
 unsigned char SerialTime_IsConfigured (void) {
-    if ((stFlags & ST_FLAG_TIME_CONFIGURED) != 0) {
-        return 1;
-    }
-    return 0;
+    return (unsigned char)((stFlags & ST_FLAG_TIME_CONFIGURED) != 0);
 }
 
 unsigned char SerialTime_GetDay (void) {
